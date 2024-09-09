@@ -1,2 +1,3 @@
 [workspace]
 members = ["epan-sys", "wsdf-derive", "wsdf"]
+resolver = "2"

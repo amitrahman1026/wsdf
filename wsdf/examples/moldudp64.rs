@@ -2,7 +2,7 @@
 
 use wsdf::{version, Protocol, ProtocolField};
 
-version!("0.0.1", 4, 0);
+version!("0.0.1", 4, 4);
 
 #[derive(Protocol)]
 #[wsdf(
