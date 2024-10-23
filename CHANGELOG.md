@@ -32,12 +32,15 @@ Types of changes:
 - Added [CHANGELOG](https://github.com/amitrahman1026/wsdf/pull/2)
 - Rust workspace resolver version '2' is added.
 
+### Changed
+
+- Pinning wireshark to [v4.0.18rc0](https://gitlab.com/wireshark/wireshark/-/commits/v4.0.18rc0?ref_type=tags) for backported fixes.
+
 ## [0.1.0] - 2015-08-04
 
 ### Added
 
 - Initial release of the project.
-
 
 [unreleased]: https://github.com/amitrahman1026/wsdf
 [0.1.0]: https://github.com/ghpr-asia/wsdf 
