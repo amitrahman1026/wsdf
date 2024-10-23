@@ -29,7 +29,7 @@ Types of changes:
 
 ### Added
 
-- Added CHANGELOG
+- Added [CHANGELOG](https://github.com/amitrahman1026/wsdf/pull/2)
 - Rust workspace resolver version '2' is added.
 
 ## [0.1.0] - 2015-08-04
@@ -41,4 +41,4 @@ Types of changes:
 
 [unreleased]: https://github.com/amitrahman1026/wsdf
 [0.1.0]: https://github.com/ghpr-asia/wsdf 
-<!-- #TODO: Add release tag for current versions -->
+<!-- #TODO: Add release tag for current version of wsdf on ghpr -->
