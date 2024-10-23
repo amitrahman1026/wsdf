@@ -34,7 +34,7 @@ Types of changes:
 
 ### Changed
 
-- Pinning wireshark to [v4.0.18rc0](https://gitlab.com/wireshark/wireshark/-/commits/v4.0.18rc0?ref_type=tags) for backported fixes.
+- Pinning wireshark to [stable release 4.4.1](https://gitlab.com/wireshark/wireshark/-/tags/wireshark-4.4.1) for backported fixes.
 
 ## [0.1.0] - 2015-08-04
 
