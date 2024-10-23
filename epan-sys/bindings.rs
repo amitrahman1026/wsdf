@@ -27292,7 +27292,7 @@ extern "C" {
     pub fn tvb_get_ds_tvb(tvb: *mut tvbuff_t) -> *mut tvbuff;
 }
 extern "C" {
-    pub fn tvb_get_guint8(tvb: *mut tvbuff_t, offset: gint) -> guint8;
+    pub fn tvb_get_uint8(tvb: *mut tvbuff_t, offset: gint) -> guint8;
 }
 extern "C" {
     pub fn tvb_get_gint8(tvb: *mut tvbuff_t, offset: gint) -> gint8;
@@ -27394,43 +27394,43 @@ extern "C" {
     pub fn tvb_get_letohieee_double(tvb: *mut tvbuff_t, offset: gint) -> gdouble;
 }
 extern "C" {
-    pub fn tvb_get_guint16(tvb: *mut tvbuff_t, offset: gint, encoding: guint) -> guint16;
+    pub fn tvb_get_uint16(tvb: *mut tvbuff_t, offset: gint, encoding: guint) -> guint16;
 }
 extern "C" {
     pub fn tvb_get_gint16(tvb: *mut tvbuff_t, offset: gint, encoding: guint) -> gint16;
 }
 extern "C" {
-    pub fn tvb_get_guint24(tvb: *mut tvbuff_t, offset: gint, encoding: guint) -> guint32;
+    pub fn tvb_get_uint24(tvb: *mut tvbuff_t, offset: gint, encoding: guint) -> guint32;
 }
 extern "C" {
     pub fn tvb_get_gint24(tvb: *mut tvbuff_t, offset: gint, encoding: guint) -> gint32;
 }
 extern "C" {
-    pub fn tvb_get_guint32(tvb: *mut tvbuff_t, offset: gint, encoding: guint) -> guint32;
+    pub fn tvb_get_uint32(tvb: *mut tvbuff_t, offset: gint, encoding: guint) -> guint32;
 }
 extern "C" {
     pub fn tvb_get_gint32(tvb: *mut tvbuff_t, offset: gint, encoding: guint) -> gint32;
 }
 extern "C" {
-    pub fn tvb_get_guint40(tvb: *mut tvbuff_t, offset: gint, encoding: guint) -> guint64;
+    pub fn tvb_get_uint40(tvb: *mut tvbuff_t, offset: gint, encoding: guint) -> guint64;
 }
 extern "C" {
     pub fn tvb_get_gint40(tvb: *mut tvbuff_t, offset: gint, encoding: guint) -> gint64;
 }
 extern "C" {
-    pub fn tvb_get_guint48(tvb: *mut tvbuff_t, offset: gint, encoding: guint) -> guint64;
+    pub fn tvb_get_uint48(tvb: *mut tvbuff_t, offset: gint, encoding: guint) -> guint64;
 }
 extern "C" {
     pub fn tvb_get_gint48(tvb: *mut tvbuff_t, offset: gint, encoding: guint) -> gint64;
 }
 extern "C" {
-    pub fn tvb_get_guint56(tvb: *mut tvbuff_t, offset: gint, encoding: guint) -> guint64;
+    pub fn tvb_get_uint56(tvb: *mut tvbuff_t, offset: gint, encoding: guint) -> guint64;
 }
 extern "C" {
     pub fn tvb_get_gint56(tvb: *mut tvbuff_t, offset: gint, encoding: guint) -> gint64;
 }
 extern "C" {
-    pub fn tvb_get_guint64(tvb: *mut tvbuff_t, offset: gint, encoding: guint) -> guint64;
+    pub fn tvb_get_uint64(tvb: *mut tvbuff_t, offset: gint, encoding: guint) -> guint64;
 }
 extern "C" {
     pub fn tvb_get_gint64(tvb: *mut tvbuff_t, offset: gint, encoding: guint) -> gint64;

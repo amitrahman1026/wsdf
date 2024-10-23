@@ -1142,7 +1142,7 @@ impl Primitive {
         // A closure, for convenience, to grab an integer value from the TVB
         let get_int = |typ: &str| {
             let ws_enc = match typ {
-                "guint8" | "gint8" => None,
+                "uint8" | "gint8" => None,
                 _ => Some(self.ws_enc()),
             };
             let func_name = format_ident!("tvb_get_{}", typ);
@@ -1158,10 +1158,10 @@ impl Primitive {
         };
 
         let ret = match &self.typ {
-            U8 => get_int("guint8"),
-            U16 => get_int("guint16"),
-            U32 => get_int("guint32"),
-            U64 => get_int("guint64"),
+            U8 => get_int("uint8"),
+            U16 => get_int("uint16"),
+            U32 => get_int("uint32"),
+            U64 => get_int("uint64"),
             I8 => get_int("gint8"),
             I16 => get_int("gint16"),
             I32 => get_int("gint32"),

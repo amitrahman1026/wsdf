@@ -40,11 +40,11 @@ impl Parse for VersionMacroInput {
 ///
 /// # Example
 ///
-/// The following usage declares a plugin version of 0.0.1, built for wireshark version 4.0.x.
+/// The following usage declares a plugin version of 0.0.1, built for wireshark version 4.4.x.
 ///
 /// ```
 /// use wsdf_derive::version;
-/// version!("0.0.1", 4, 0);
+/// version!("0.0.1", 4, 4);
 /// ```
 #[proc_macro]
 pub fn version(input: TokenStream) -> TokenStream {
