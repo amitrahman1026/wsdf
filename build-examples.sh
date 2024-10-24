@@ -4,7 +4,7 @@
 # Helper script to build all our example dissectors, and copies them to where Wireshark will search
 #
 cargo build --examples
-epan_dir=~/.local/lib/wireshark/plugins/4.0/epan/
+epan_dir=~/.local/lib/wireshark/plugins/4.4/epan/
 for file in wsdf/examples/*
 do
 	filename=$(basename -- "$file")

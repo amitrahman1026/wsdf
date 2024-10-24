@@ -2,7 +2,7 @@
 
 use wsdf::{version, Protocol};
 
-version!("0.0.1", 4, 0);
+version!("0.0.1", 4, 4);
 
 // The ip.proto field obtained from http://www.iana.org/assignments/protocol-numbers/protocol-numbers.xml
 

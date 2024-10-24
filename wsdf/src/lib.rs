@@ -31,7 +31,7 @@
 //!
 //! ```rust
 //! // lib.rs
-//! wsdf::version!("0.0.1", 4, 0);
+//! wsdf::version!("0.0.1", 4, 4);
 //!
 //! #[derive(wsdf::Protocol)]
 //! #[wsdf(decode_from = [("ip.proto", 17)])]
@@ -46,7 +46,7 @@
 //! ```
 //!
 //! * The **`wsdf::version!` macro** specifies the plugin version as 0.0.1, built for Wireshark
-//! version 4.0.X. This information is required by Wireshark when loading the plugin.
+//! version 4.4.X. This information is required by Wireshark when loading the plugin.
 //! * The protocol itself should **derive `wsdf::Protocol`**. Since this is UDP, the dissector is
 //! registered to the `"ip.proto"` dissector table, and also sets up the `"udp.port"` dissector
 //! table for subdissectors to use. More details about these annotations can be found in the
@@ -65,7 +65,7 @@
 //! this file to Wireshark's [plugin
 //! folder](https://www.wireshark.org/docs/wsug_html_chunked/ChPluginFolders.html) will allow
 //! Wireshark or tshark to load it upon startup. On Linux, this is at
-//! `~/.local/lib/wireshark/plugins/4.0/epan/`.
+//! `~/.local/lib/wireshark/plugins/4.4/epan/`.
 //!
 //! # Types
 //!
