@@ -77,3 +77,8 @@ sort of public API but historically there has been no separation and everything 
 up as a DISSECTOR_PUBLIC_HEADER more or less automatically and indiscriminately (because of a lack
 of clear guidelines). In the future this unsatisfactory situation should be fixed somehow.
 
+
+## Binary compatibility
+Theres no guarantee made that wireshark is binary compatible between different versions
+and assumptions should not be made expecting so, plugins generated with a certain version of 
+libwireshark may not be portable to other versions.
