@@ -1,6 +1,14 @@
+//! # About wsdf
+//!
 //! **wsdf** (**W**ire**s**hark **D**issector **F**ramework) is a proc-macro based framework to
-//! generate Wireshark dissectors from your Rust data types. Using wsdf, you can write dissectors
-//! in a declarative way, all from within Rust.
+//! generate Wireshark dissectors plugins from your Rust data types. Wireshark plugins are
+//! modular dissectors that add protocol support to Wireshark without modifying source code.
+//!
+//! This crate leverages Rust's proc-marcos to write plugins in a declarative manner.
+//!
+//! Keep in mind, as this crate generate "out-of-tree" plugins, plugins need to be recompiled
+//! for each mamajor.minor Wireshark version, as Wireshark does not guarantee binary compatibily
+//! acress these versions!
 //!
 //! Examples can be found in the
 //! [GitHub repo](https://github.com/ghpr-asia/wsdf/tree/main/wsdf/examples/).
