@@ -34,7 +34,8 @@ Types of changes:
 
 ### Changed
 
-- Pinning wireshark to [stable release 4.4.1](https://gitlab.com/wireshark/wireshark/-/tags/wireshark-4.4.1) for backported fixes.
+- Pinning wireshark to [stable release 4.4.1](https://gitlab.com/wireshark/wireshark/-/tags/wireshark-4.4.1) for backported fixes on wireshark (e.g. Fixed CMake's python module finding [bugs](https://gitlab.com/wireshark/wireshark/-/commit/601bf39e6b2eaff9e77588ff1b1a8a987dad404d))
+- The `tvb_get_guintX` and `tvb_get_gintX` functions in the tvbuff API has been renamed to `tvb_get_uintX` and `tvb_get_intX` (the GLib-style "g" has been removed). The old-style names have been deprecated.
 
 ## [0.1.0] - 2015-08-04
 
