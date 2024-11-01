@@ -1,3 +1,40 @@
+Be aware of possible incoming changes to the plugin API
+
+    There is [discussion](https://lists.wireshark.org/archives/wireshark-dev/202312/msg00000.html)
+    on the wireshark-dev mailing list about changes to the plugin API. This has
+    been in the works for a while, and got reverted once. But it is likely to
+    happen in the future. Ideally maintainers should keep an eye on this.
+    Interesting thread to follow as [well.](https://gitlab.com/wireshark/wireshark/-/merge_requests/13747)
+
+Create integration testing for wsdf generated plugins
+
+    As of now, besides unit tests, theres not an end to end testing framework
+    that will give a better outlook on parity of wsdf generated plugins and 
+    wireshark native plugin functionality.
+
+    A good approach would be to either hook onto the test suite of wireshark.
+
+
+Improve cross platform building and pin releases to wireshark versions
+
+    There have been various issues of end users not being able to build, not
+    being able to generate usable plugins. This is in part due to the building,
+    in part due to api changes in plugin creation and unmanaged wireshark
+    versions.
+
+    We could really use some unification on the build system.
+
+    1. The most pressing issue wrt to plugins would be related to supporting 
+    changes in plug in creation APIs since wireshark 4.2.x.
+
+    2. Some of the API now uses C99 types instead of 
+    [GLib types](https://gitlab.com/wireshark/wireshark/-/issues/19116). 
+    Appropriate changes will need to be backported down to 4.2.x.
+
+    On top of that, there should be a better way to decouple and allow for
+    flexibility of the underlying wireshark system.
+
+
 Add logs to generated code
 
     Currently, the generated code does not log anything. This makes it hard to
