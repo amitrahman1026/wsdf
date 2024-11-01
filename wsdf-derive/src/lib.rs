@@ -119,6 +119,13 @@ fn derive_protocol_impl(input: &syn::DeriveInput) -> syn::Result<proc_macro2::To
 
     let input_ident = &input.ident;
 
+    let plugin_describe = quote! {
+        #[no_mangle]
+        pub extern "C" fn plugin_describe() -> u32 {
+            wsdf::epan_sys::WS_PLUGIN_DESC_DISSECTOR
+        }
+    };
+
     let plugin_register = quote! {
         #[no_mangle]
         extern "C" fn plugin_register() {
@@ -211,6 +218,8 @@ fn derive_protocol_impl(input: &syn::DeriveInput) -> syn::Result<proc_macro2::To
 
     let ret = quote! {
         #plugin_register
+
+        #plugin_describe
 
         impl wsdf::Protocol for #input_ident {
             #main_dissect_fn
