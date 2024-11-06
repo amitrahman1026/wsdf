@@ -119,6 +119,9 @@ fn derive_protocol_impl(input: &syn::DeriveInput) -> syn::Result<proc_macro2::To
 
     let input_ident = &input.ident;
 
+    let proto_register_ident = format_ident!("proto_register_{}", snake_cased);
+    let proto_reg_handoff_ident = format_ident!("proto_reg_handoff_{}", snake_cased);
+
     let plugin_describe = quote! {
         #[no_mangle]
         pub extern "C" fn plugin_describe() -> u32 {
@@ -133,12 +136,22 @@ fn derive_protocol_impl(input: &syn::DeriveInput) -> syn::Result<proc_macro2::To
                 register_protoinfo: None,
                 register_handoff: None,
             };
+
+            // Wrapper names to test convention
+            extern "C" fn #proto_register_ident() {
+                <#input_ident as wsdf::Protocol>::proto_register()
+            }
+
+            extern "C" fn #proto_reg_handoff_ident() {
+                <#input_ident as wsdf::Protocol>::proto_reg_handoff()
+            }
+
             // SAFETY: this code is only called once in a single thread when wireshark starts
             unsafe {
                 plug.register_protoinfo =
-                    std::option::Option::Some(<#input_ident as wsdf::Protocol>::proto_register);
+                    std::option::Option::Some(#proto_register_ident);
                 plug.register_handoff =
-                    std::option::Option::Some(<#input_ident as wsdf::Protocol>::proto_reg_handoff);
+                    std::option::Option::Some(#proto_reg_handoff_ident);
                 wsdf::epan_sys::proto_register_plugin(&plug);
             }
         }
