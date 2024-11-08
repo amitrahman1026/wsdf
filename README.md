@@ -27,7 +27,7 @@ DNS, showcased below.
 
 ![DNS dissector showcase](https://raw.githubusercontent.com/ghpr-asia/wsdf/main/docs/dns_dissector.gif)
 
-wsdf has been tested on Linux against Wireshark 4.4.
+wsdf has been tested on macOS & Linux against Wireshark 4.4.x.
 
 **License**
 
