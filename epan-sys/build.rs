@@ -11,8 +11,14 @@ fn main() {
         return;
     }
 
-    // By default, we will just use a pre-generated bindings.rs file. If this feature is turned
-    // on, we'll re-generate the bindings at build time.
+    let bindings_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("bindings.rs");
+    
+    // Generate fresh bindings when this crate is used for the first time
+    if !bindings_path.exists() || cfg!(feature = "bindgen") {
+        generate_bindings();
+    }
+
+    // By turning this features on, users will be able to regenerate their binding.rs
     #[cfg(feature = "bindgen")]
     generate_bindings();
 
@@ -44,6 +50,11 @@ fn link_wireshark() {
             dylib_dir.to_string_lossy()
         );
     }
+}
+
+#[cfg(not(feature = "bindgen"))]
+fn generate_bindings() {
+    panic!("Initial build requires --features bindgen. Please run: cargo build --features bindgen");
 }
 
 #[cfg(feature = "bindgen")]
