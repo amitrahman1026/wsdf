@@ -29,8 +29,18 @@ Types of changes:
 
 ### Added
 
-- Added CHANGELOG
+- Added [CHANGELOG](https://github.com/amitrahman1026/wsdf/pull/2)
 - Rust workspace resolver version '2' is added.
+- Added option to specify type of wireshark plugin created, with a fallback to Epan type plugin
+- Added support for wsdf generated plugins to load correctly macOS
+
+### Changed
+
+- Pinning wireshark to [stable release 4.4.1](https://gitlab.com/wireshark/wireshark/-/tags/wireshark-4.4.1) for backported fixes on wireshark (e.g. Fixed CMake's python module finding [bugs](https://gitlab.com/wireshark/wireshark/-/commit/601bf39e6b2eaff9e77588ff1b1a8a987dad404d))
+- The `tvb_get_guintX` and `tvb_get_gintX` functions in the tvbuff API has been renamed to `tvb_get_uintX` and `tvb_get_intX` (the GLib-style "g" has been removed). The old-style names have been deprecated.
+- `#[derive(Protocol)]` will now correctly register dissector protocols with unique `proto_register_xxx` in line with breaking wireshark plugin API changes since release 4.2.x
+- `plugin_describe()` will now be implemented to properly build a plugin since 4.2.x
+
 
 ## [0.1.0] - 2015-08-04
 
@@ -38,7 +48,6 @@ Types of changes:
 
 - Initial release of the project.
 
-
 [unreleased]: https://github.com/amitrahman1026/wsdf
 [0.1.0]: https://github.com/ghpr-asia/wsdf 
-<!-- #TODO: Add release tag for current versions -->
+<!-- #TODO: Add release tag for current version of wsdf on ghpr -->

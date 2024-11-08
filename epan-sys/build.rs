@@ -11,8 +11,14 @@ fn main() {
         return;
     }
 
-    // By default, we will just use a pre-generated bindings.rs file. If this feature is turned
-    // on, we'll re-generate the bindings at build time.
+    let bindings_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("bindings.rs");
+    
+    // Generate fresh bindings when this crate is used for the first time
+    if !bindings_path.exists() || cfg!(feature = "bindgen") {
+        generate_bindings();
+    }
+
+    // By turning this features on, users will be able to regenerate their binding.rs
     #[cfg(feature = "bindgen")]
     generate_bindings();
 
@@ -44,6 +50,11 @@ fn link_wireshark() {
             dylib_dir.to_string_lossy()
         );
     }
+}
+
+#[cfg(not(feature = "bindgen"))]
+fn generate_bindings() {
+    panic!("Initial build requires --features bindgen. Please run: cargo build --features bindgen");
 }
 
 #[cfg(feature = "bindgen")]
@@ -96,30 +107,40 @@ fn clone_wireshark_or_die() {
 }
 
 fn build_wireshark() -> PathBuf {
-    cmake::Config::new("wireshark")
-        .define("BUILD_androiddump", "OFF")
-        .define("BUILD_capinfos", "OFF")
-        .define("BUILD_captype", "OFF")
-        .define("BUILD_ciscodump", "OFF")
-        .define("BUILD_corbaidl2wrs", "OFF")
-        .define("BUILD_dcerpcidl2wrs", "OFF")
-        .define("BUILD_dftest", "OFF")
-        .define("BUILD_dpauxmon", "OFF")
-        .define("BUILD_dumpcap", "OFF")
-        .define("BUILD_editcap", "OFF")
-        .define("BUILD_etwdump", "OFF")
-        .define("BUILD_logray", "OFF")
-        .define("BUILD_mergecap", "OFF")
-        .define("BUILD_randpkt", "OFF")
-        .define("BUILD_randpktdump", "OFF")
-        .define("BUILD_rawshark", "OFF")
-        .define("BUILD_reordercap", "OFF")
-        .define("BUILD_sshdump", "OFF")
-        .define("BUILD_text2pcap", "OFF")
-        .define("BUILD_tfshark", "OFF")
-        .define("BUILD_tshark", "OFF")
-        .define("BUILD_wifidump", "OFF")
-        .define("BUILD_wireshark", "OFF")
-        .define("BUILD_xxx2deb", "OFF")
-        .build()
+    let result = std::panic::catch_unwind(|| {
+        cmake::Config::new("wireshark")
+            .define("BUILD_androiddump", "OFF")
+            .define("BUILD_capinfos", "OFF")
+            .define("BUILD_captype", "OFF")
+            .define("BUILD_ciscodump", "OFF")
+            .define("BUILD_corbaidl2wrs", "OFF")
+            .define("BUILD_dcerpcidl2wrs", "OFF")
+            .define("BUILD_dftest", "OFF")
+            .define("BUILD_dpauxmon", "OFF")
+            .define("BUILD_dumpcap", "OFF")
+            .define("BUILD_editcap", "OFF")
+            .define("BUILD_etwdump", "OFF")
+            .define("BUILD_logray", "OFF")
+            .define("BUILD_mergecap", "OFF")
+            .define("BUILD_randpkt", "OFF")
+            .define("BUILD_randpktdump", "OFF")
+            .define("BUILD_rawshark", "OFF")
+            .define("BUILD_reordercap", "OFF")
+            .define("BUILD_sshdump", "OFF")
+            .define("BUILD_text2pcap", "OFF")
+            .define("BUILD_tfshark", "OFF")
+            .define("BUILD_tshark", "OFF")
+            .define("BUILD_wifidump", "OFF")
+            .define("BUILD_wireshark", "OFF")
+            .define("BUILD_xxx2deb", "OFF")
+            .build()
+    });
+    match result {
+        Ok(path) => path,
+        Err(_err) => {
+            println!("cargo:warning=Failed to build wireshark from source possibly due to missing dependancies.\nPlease check https://www.wireshark.org/docs/wsdg_html_chunked/ChapterSetup.html for details on how to setup build environmen
+t to build Wireshark");
+            std::process::exit(1)
+        }
+    }
 }
