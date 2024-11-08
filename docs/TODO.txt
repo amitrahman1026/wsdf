@@ -1,3 +1,36 @@
+Be aware of possible incoming changes to the plugin API
+
+    There is [discussion](https://lists.wireshark.org/archives/wireshark-dev/202312/msg00000.html)
+    on the wireshark-dev mailing list about changes to the plugin API. This has
+    been in the works for a while, and got reverted once. But it is likely to
+    happen in the future. Ideally maintainers should keep an eye on this.
+    Interesting thread to follow as [well.](https://gitlab.com/wireshark/wireshark/-/merge_requests/13747)
+
+Create integration testing for wsdf generated plugins
+
+    As of now, besides unit tests, theres not an end to end testing framework
+    that will give a better outlook on parity of wsdf generated plugins and 
+    wireshark native plugin functionality.
+
+    A good approach would be to hook onto the test suite of wireshark which uses
+    tshark to run against sample pcap files for integration testing.
+
+
+Improve cross platform building and pin releases to wireshark versions
+
+    Portability options have been provided for macOS solving some users reported
+    issues. However it would be great to explore using cargo to handle this. 
+
+    On top of that, there should be a better way to decouple and allow for
+    flexibility of the underlying wireshark system. Currently beyond the gitsubmodule
+    commit, there is not a more robust pinned version of wireshark.
+
+    It may be worthwhile to explore extending the build.rs or cargo xtasks for 
+    more rigid portability
+
+    Windows remain untested.
+
+
 Add logs to generated code
 
     Currently, the generated code does not log anything. This makes it hard to
