@@ -32,6 +32,7 @@ Types of changes:
 - Added [CHANGELOG](https://github.com/amitrahman1026/wsdf/pull/2)
 - Rust workspace resolver version '2' is added.
 - Added option to specify type of wireshark plugin created, with a fallback to Epan type plugin
+- Added support for wsdf generated plugins to load correctly macOS
 
 ### Changed
 
