@@ -9,7 +9,7 @@ cargo build --examples
 
 case "$OSTYPE" in
   darwin*) 
-    epan_dir="/Applications/Wireshark.app/Contents/PlugIns/wireshark/4-4/epan"
+    epan_dir="$HOME/.local/lib/wireshark/plugins/4-4/epan"
     lib_ext="dylib"
     ;;
   linux*)  
