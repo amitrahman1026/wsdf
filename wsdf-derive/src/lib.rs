@@ -15,10 +15,52 @@ use crate::model::DataRoot;
 use crate::util::*;
 
 #[derive(Debug)]
+enum PluginType {
+    Dissector,
+    FileType,
+    Codec,
+    Epan,
+    TapListener,
+    DFilter,
+}
+
+impl Parse for PluginType {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let ident: syn::Ident = Parse::parse(input)?;
+        match ident.to_string().as_str() {
+            "Dissector" => Ok(PluginType::Dissector),
+            "FileType" => Ok(PluginType::FileType),
+            "Codec" => Ok(PluginType::Codec),
+            "Epan" => Ok(PluginType::Epan),
+            "TapListener" => Ok(PluginType::TapListener),
+            "DFilter" => Ok(PluginType::DFilter),
+            _ => Err(syn::Error::new(
+                ident.span(),
+                "Invalid plugin type. Expected one of: Dissector, FileType, Codec, Epan, TapListener, DFilter",
+            )),
+        }
+    }
+}
+
+impl PluginType {
+    fn to_const_ident(&self) -> proc_macro2::TokenStream {
+        match self {
+            PluginType::Dissector => quote! {WS_PLUGIN_DESC_DISSECTOR},
+            PluginType::FileType => quote!(WS_PLUGIN_DESC_FILE_TYPE),
+            PluginType::Codec => quote!(WS_PLUGIN_DESC_CODEC),
+            PluginType::Epan => quote!(WS_PLUGIN_DESC_EPAN),
+            PluginType::TapListener => quote!(WS_PLUGIN_DESC_TAP_LISTENER),
+            PluginType::DFilter => quote!(WS_PLUGIN_DESC_DFILTER),
+        }
+    }
+}
+
+#[derive(Debug)]
 struct VersionMacroInput {
     plugin_ver: syn::LitStr,
     ws_major_ver: syn::LitInt,
     ws_minor_ver: syn::LitInt,
+    plugin_type: Option<PluginType>,
 }
 
 impl Parse for VersionMacroInput {
@@ -28,10 +70,20 @@ impl Parse for VersionMacroInput {
         let ws_major_ver = Parse::parse(input)?;
         <syn::Token![,]>::parse(input)?;
         let ws_minor_ver = Parse::parse(input)?;
+
+        // Check if user provided another parameter to specify plugin type
+        let plugin_type = if input.peek(syn::Token![,]) {
+            input.parse::<syn::Token![,]>()?;
+            Some(input.parse()?)
+        } else {
+            None
+        };
+
         Ok(VersionMacroInput {
             plugin_ver,
             ws_major_ver,
             ws_minor_ver,
+            plugin_type,
         })
     }
 }
@@ -46,6 +98,21 @@ impl Parse for VersionMacroInput {
 /// use wsdf_derive::version;
 /// version!("0.0.1", 4, 4);
 /// ```
+///
+/// An optional 4th parameter can be passed into to specify the type of wireshark plugin to be
+/// generated. This can be one of: Dissector, FileType, Codec, Epan, TapListener, DFilter.
+///
+///```
+/// // Default to Epan type plugin
+/// version!("0.0.1", 4, 4);
+///
+/// // Explicitly specify Dissector
+/// version!("0.0.1", 4, 4, Dissector);
+///
+/// // Specify a different type
+/// version!("0.0.1", 4, 4, FileType);
+///```
+///
 #[proc_macro]
 pub fn version(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as VersionMacroInput);
@@ -60,6 +127,12 @@ pub fn version(input: TokenStream) -> TokenStream {
     let ws_major_ver = input.ws_major_ver;
     let ws_minor_ver = input.ws_minor_ver;
 
+    let plugin_type_const = input
+        .plugin_type
+        .as_ref()
+        .unwrap_or(&PluginType::Epan)
+        .to_const_ident();
+
     let version_info = quote! {
         #[no_mangle]
         #[used]
@@ -70,6 +143,11 @@ pub fn version(input: TokenStream) -> TokenStream {
         #[no_mangle]
         #[used]
         static plugin_want_minor: std::ffi::c_int = #ws_minor_ver;
+
+        #[no_mangle]
+        pub extern "C" fn plugin_describe() -> u32 {
+            wsdf::epan_sys::#plugin_type_const
+        }
     };
 
     version_info.into()
@@ -121,13 +199,6 @@ fn derive_protocol_impl(input: &syn::DeriveInput) -> syn::Result<proc_macro2::To
 
     let proto_register_ident = format_ident!("proto_register_{}", snake_cased);
     let proto_reg_handoff_ident = format_ident!("proto_reg_handoff_{}", snake_cased);
-
-    let plugin_describe = quote! {
-        #[no_mangle]
-        pub extern "C" fn plugin_describe() -> u32 {
-            wsdf::epan_sys::WS_PLUGIN_DESC_DISSECTOR
-        }
-    };
 
     let plugin_register = quote! {
         #[no_mangle]
@@ -231,8 +302,6 @@ fn derive_protocol_impl(input: &syn::DeriveInput) -> syn::Result<proc_macro2::To
 
     let ret = quote! {
         #plugin_register
-
-        #plugin_describe
 
         impl wsdf::Protocol for #input_ident {
             #main_dissect_fn
