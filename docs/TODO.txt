@@ -12,27 +12,23 @@ Create integration testing for wsdf generated plugins
     that will give a better outlook on parity of wsdf generated plugins and 
     wireshark native plugin functionality.
 
-    A good approach would be to either hook onto the test suite of wireshark.
+    A good approach would be to hook onto the test suite of wireshark which uses
+    tshark to run against sample pcap files for integration testing.
 
 
 Improve cross platform building and pin releases to wireshark versions
 
-    There have been various issues of end users not being able to build, not
-    being able to generate usable plugins. This is in part due to the building,
-    in part due to api changes in plugin creation and unmanaged wireshark
-    versions.
-
-    We could really use some unification on the build system.
-
-    1. The most pressing issue wrt to plugins would be related to supporting 
-    changes in plug in creation APIs since wireshark 4.2.x.
-
-    2. Some of the API now uses C99 types instead of 
-    [GLib types](https://gitlab.com/wireshark/wireshark/-/issues/19116). 
-    Appropriate changes will need to be backported down to 4.2.x.
+    Portability options have been provided for macOS solving some users reported
+    issues. However it would be great to explore using cargo to handle this. 
 
     On top of that, there should be a better way to decouple and allow for
-    flexibility of the underlying wireshark system.
+    flexibility of the underlying wireshark system. Currently beyond the gitsubmodule
+    commit, there is not a more robust pinned version of wireshark.
+
+    It may be worthwhile to explore extending the build.rs or cargo xtasks for 
+    more rigid portability
+
+    Windows remain untested.
 
 
 Add logs to generated code

@@ -1,10 +1,9 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 
 #
 # Helper script to build all our example plugins, and copies them to where Wireshark will search
 #
 
-# Get the directory where the script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 cargo build --examples
@@ -36,7 +35,8 @@ esac
 
 mkdir -p "$epan_dir"
 
-for file in wsdf/examples/*; do
+for file in wsdf/examples/*;
+do
     filename=$(basename -- "$file")
     example="${filename%.*}"
     shared_obj="target/debug/examples/lib${example}.${lib_ext}"

@@ -1,5 +1,4 @@
-#!/usr/bin/env bash
-# macos-plugin-postprocess.sh
+#!/usr/bin/env sh
 
 print_usage() {
     cat << EOF
