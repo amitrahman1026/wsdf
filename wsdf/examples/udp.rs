@@ -3,7 +3,15 @@
 use wsdf::{version, Protocol};
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
 version!("0.0.1", 4, 0);
+=======
+version!("0.0.1", 4, 4, Dissector);
+>>>>>>> Stashed changes
+=======
+version!("0.0.1", 4, 4, Dissector);
+>>>>>>> Stashed changes
 =======
 version!("0.0.1", 4, 4, Dissector);
 >>>>>>> Stashed changes

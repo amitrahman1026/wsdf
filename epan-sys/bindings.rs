@@ -28737,6 +28737,8 @@ extern "C" {
     pub fn wtap_opttypes_cleanup();
 }
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
 extern "C" {
     pub fn wmem_epan_scope() -> *mut wmem_allocator_t;
 }
@@ -30873,6 +30875,10 @@ extern "C" {
 extern "C" {
     pub fn ws_inet_pton6(src: *const ::std::os::raw::c_char, dst: *mut ws_in6_addr) -> bool;
 }
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
 #[repr(C)]
