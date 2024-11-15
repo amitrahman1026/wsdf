@@ -36,10 +36,9 @@
 //!
 //! ```rust
 //! // lib.rs
-//! wsdf::version!("0.0.1", 4, 4);
 //! use wsdf::{protocol, version, Dissect, Proto};
 //!
-//! version!("0.0.1", 4, 0);
+//! wsdf::version!("0.0.1", 4, 4);
 //! protocol!(Udp);
 //!
 //! #[derive(Dissect, Proto)]
