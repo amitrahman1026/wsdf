@@ -1,0 +1,3 @@
+/Users/amit/Rust/wsdf/container-dev/build/CMakeFiles/hello.dir
+/Users/amit/Rust/wsdf/container-dev/build/CMakeFiles/edit_cache.dir
+/Users/amit/Rust/wsdf/container-dev/build/CMakeFiles/rebuild_cache.dir
