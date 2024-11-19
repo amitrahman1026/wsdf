@@ -1136,7 +1136,7 @@ impl DissectorTables {
         if self.0.contains_key(&name) {
             return self.0[&name];
         }
-        let name_cstr = CString::new(name).unwrap();
+        let name_cstr = Box::leak(CString::new(name).unwrap().into_boxed_c_str());
         let table_ptr = unsafe {
             epan_sys::register_decode_as_next_proto(
                 proto_id,
