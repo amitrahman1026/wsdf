@@ -1587,7 +1587,7 @@ impl Dissect<'_, ()> for u8 {
     }
 
     fn emit(args: &DissectorArgs) -> u8 {
-        unsafe { epan_sys::tvb_get_guint8(args.tvb, args.offset as _) }
+        unsafe { epan_sys::tvb_get_uint8(args.tvb, args.offset as _) }
     }
 }
 
@@ -1755,7 +1755,7 @@ impl Dissect<'_, ()> for i8 {
     }
 
     fn emit(args: &DissectorArgs) -> i8 {
-        unsafe { epan_sys::tvb_get_gint8(args.tvb, args.offset as _) }
+        unsafe { epan_sys::tvb_get_int8(args.tvb, args.offset as _) }
     }
 }
 
@@ -1798,7 +1798,7 @@ impl Dissect<'_, ()> for i16 {
 
     fn emit(args: &DissectorArgs) -> i16 {
         let enc = args.ws_enc.unwrap_or(DEFAULT_INT_ENCODING);
-        unsafe { epan_sys::tvb_get_gint16(args.tvb, args.offset as _, enc) }
+        unsafe { epan_sys::tvb_get_int16(args.tvb, args.offset as _, enc) }
     }
 }
 
@@ -1841,7 +1841,7 @@ impl Dissect<'_, ()> for i32 {
 
     fn emit(args: &DissectorArgs) -> i32 {
         let enc = args.ws_enc.unwrap_or(DEFAULT_INT_ENCODING);
-        unsafe { epan_sys::tvb_get_gint32(args.tvb, args.offset as _, enc) }
+        unsafe { epan_sys::tvb_get_int32(args.tvb, args.offset as _, enc) }
     }
 }
 
@@ -1884,7 +1884,7 @@ impl Dissect<'_, ()> for i64 {
 
     fn emit(args: &DissectorArgs) -> i64 {
         let enc = args.ws_enc.unwrap_or(DEFAULT_INT_ENCODING);
-        unsafe { epan_sys::tvb_get_gint64(args.tvb, args.offset as _, enc) }
+        unsafe { epan_sys::tvb_get_int64(args.tvb, args.offset as _, enc) }
     }
 }
 
