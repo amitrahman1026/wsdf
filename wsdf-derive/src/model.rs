@@ -1,9 +1,9 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
-use quote::{format_ident, quote};
-use syn::{parse_quote, punctuated::Punctuated, spanned::Spanned};
+use quote::format_ident;
+use syn::{parse_quote, punctuated::Punctuated};
 
-use crate::{attributes::*, types::*, util::*};
+use crate::{attributes::*, util::*};
 
 /// The "innards" of a struct-like object we care about. This is either a unit tuple or a regular
 /// thing with named fields.

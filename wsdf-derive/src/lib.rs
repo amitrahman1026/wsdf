@@ -8,7 +8,6 @@ use syn::parse_quote;
 
 mod attributes;
 mod model;
-mod types;
 mod util;
 
 use crate::attributes::*;
