@@ -3,7 +3,7 @@ use std::fmt::Display;
 use once_cell::sync::Lazy;
 use quote::{format_ident, quote};
 use regex::{Captures, Regex};
-use syn::{parse_quote, punctuated::Punctuated, spanned::Spanned};
+use syn::{parse_quote, spanned::Spanned};
 
 pub(crate) fn make_err<T>(tok: &impl Spanned, msg: &str) -> Result<T, syn::Error> {
     Err(syn::Error::new(tok.span(), msg))
@@ -71,25 +71,6 @@ impl quote::ToTokens for IdentHelper<'_> {
         Into::<proc_macro2::Ident>::into(*self).to_tokens(tokens);
     }
 }
-
-pub(crate) const WSDF_PARENT_NODE: IdentHelper = IdentHelper("__wsdf_parent");
-pub(crate) const WSDF_OFFSET: IdentHelper = IdentHelper("__wsdf_offset");
-pub(crate) const WSDF_DISSECTOR_TABLE: IdentHelper = IdentHelper("__wsdf_dissector_table");
-pub(crate) const WSDF_PROTO_ID: IdentHelper = IdentHelper("__wsdf_proto_id");
-pub(crate) const WSDF_TVB: IdentHelper = IdentHelper("__wsdf_tvb");
-pub(crate) const WSDF_START: IdentHelper = IdentHelper("__wsdf_start");
-pub(crate) const WSDF_PINFO: IdentHelper = IdentHelper("__wsdf_pinfo");
-pub(crate) const WSDF_PREFIX: IdentHelper = IdentHelper("__wsdf_prefix");
-pub(crate) const WSDF_PREFIX_NEXT: IdentHelper = IdentHelper("__wsdf_prefix_next");
-pub(crate) const WSDF_DISPATCH: IdentHelper = IdentHelper("__wsdf_dispatch");
-pub(crate) const WSDF_SUBTREE_LABEL: IdentHelper = IdentHelper("__wsdf_subtree_label");
-pub(crate) const WSDF_TVB_BUF: IdentHelper = IdentHelper("__wsdf_tvb_buf");
-pub(crate) const WSDF_HFS: IdentHelper = IdentHelper("__wsdf_hfs");
-pub(crate) const WSDF_FIELD_IDENT: IdentHelper = IdentHelper("__wsdf_field_ident");
-pub(crate) const WSDF_FIELD_BLURB: IdentHelper = IdentHelper("__wsdf_field_blurb");
-pub(crate) const WSDF_PROTO_TREE_ROOT: IdentHelper = IdentHelper("__wsdf_proto_tree_root");
-pub(crate) const WSDF_FIELDS_STORE: IdentHelper = IdentHelper("__wsdf_fields_store");
-pub(crate) const WSDF_TAP_CTX: IdentHelper = IdentHelper("__wsdf_tap_ctx");
 
 /// Unpacks an array or tuple expression into its individual elements. Otherwise, return the
 /// original expression.
@@ -295,56 +276,6 @@ mod test_case_convert {
         for (tt, want) in tests {
             assert_eq!(tt.to_wsdf_upper_case(), want);
         }
-    }
-}
-
-#[derive(Clone, Copy)]
-pub(crate) struct _DissectionParams;
-pub(crate) const DISSECTION_PARAMS: _DissectionParams = _DissectionParams;
-
-impl From<_DissectionParams> for Punctuated<syn::FnArg, syn::Token![,]> {
-    fn from(_val: _DissectionParams) -> Self {
-        // Note that we have some 'a lifetimes here. Thus we'll have to remember to declare the 'a
-        // anywhere this is used.
-        parse_quote! {
-            #WSDF_START: std::ffi::c_int,
-            #WSDF_TVB: *mut wsdf::epan_sys::tvbuff,
-            #WSDF_PARENT_NODE: *mut wsdf::epan_sys::_proto_node,
-            #WSDF_PREFIX: &str,
-            #WSDF_DISPATCH: wsdf::VariantDispatch,
-            #WSDF_SUBTREE_LABEL: wsdf::SubtreeLabel,
-            #WSDF_TVB_BUF: &'a [u8],
-            #WSDF_PINFO: *mut wsdf::epan_sys::_packet_info,
-            #WSDF_PROTO_TREE_ROOT: *mut wsdf::epan_sys::_proto_node,
-            #WSDF_FIELDS_STORE: &mut wsdf::FieldsStore<'a>,
-        }
-    }
-}
-
-impl quote::ToTokens for _DissectionParams {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        Into::<Punctuated<syn::FnArg, syn::Token![,]>>::into(*self).to_tokens(tokens);
-    }
-}
-
-#[derive(Clone, Copy)]
-pub(crate) struct _RegistrationParams;
-pub(crate) const REGISTRATION_PARAMS: _RegistrationParams = _RegistrationParams;
-
-impl From<_RegistrationParams> for Punctuated<syn::FnArg, syn::Token![,]> {
-    fn from(_val: _RegistrationParams) -> Self {
-        parse_quote! {
-            #WSDF_PREFIX: &str,
-            #WSDF_PROTO_ID: std::ffi::c_int,
-            #WSDF_FIELD_IDENT: wsdf::FieldIdent,
-            #WSDF_FIELD_BLURB: wsdf::FieldBlurb,
-        }
-    }
-}
-
-impl quote::ToTokens for _RegistrationParams {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        Into::<Punctuated<syn::FnArg, syn::Token![,]>>::into(*self).to_tokens(tokens);
     }
 }
 
