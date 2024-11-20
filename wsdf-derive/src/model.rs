@@ -808,9 +808,6 @@ fn get_field_dissection_plans(fields: &[NamedField]) -> Vec<FieldDissectionPlan>
                 fields_to_emit.insert(field);
             }
         }
-        if let Some(dispatch_field) = &options.dispatch {
-            fields_to_emit.insert(dispatch_field);
-        }
         if let Some(len_field) = &options.size_hint {
             fields_to_emit.insert(len_field);
         }
