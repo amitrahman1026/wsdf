@@ -102,7 +102,7 @@ impl Parse for VersionMacroInput {
 /// An optional 4th parameter can be passed into to specify the type of wireshark plugin to be
 /// generated. This can be one of: Dissector, FileType, Codec, Epan, TapListener, DFilter.
 ///
-///```
+///```ignore
 /// // Default to Epan type plugin
 /// version!("0.0.1", 4, 4);
 ///

@@ -2218,15 +2218,15 @@ mod test_with_dummy_proto {
     /// Checks the a hf index is not -1, and that when queried, it returns a non-null pointer to a
     /// header_field_info struct.
     macro_rules! assert_hf_ok {
-		($idx:expr $(,)?) => {
-			assert_ne!($idx, -1);
-			assert_ne!(unsafe { epan_sys::proto_registrar_get_nth($idx as _) }, std::ptr::null_mut());
-		};
-		($idx:expr, $($idxs:expr),+ $(,)?) => {
-			assert_hf_ok!($idx);
-			assert_hf_ok!($($idxs),+);
-		}
-	}
+        ($idx:expr $(,)?) => {
+            assert_ne!($idx, -1);
+            assert_ne!(unsafe { epan_sys::proto_registrar_get_nth($idx as _) }, std::ptr::null_mut());
+        };
+        ($idx:expr, $($idxs:expr),+ $(,)?) => {
+            assert_hf_ok!($idx);
+            assert_hf_ok!($($idxs),+);
+        }
+    }
 
     #[test]
     fn can_insert_hf() {
@@ -2307,7 +2307,7 @@ mod test_with_dummy_proto {
 
 #[cfg(test)]
 mod compile_tests {
-    #[ignore] // pending test updates in next pr
+    #[ignore] // Pending test updates in next PR
     #[test]
     fn run_all() {
         let t = trybuild::TestCases::new();
