@@ -99,6 +99,7 @@ pub(crate) enum Subdissector {
     },
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum SubdissectorTableType {
     Uint {
@@ -505,6 +506,7 @@ pub(crate) struct FieldDisplayPair {
 }
 
 impl FieldDisplayPair {
+    #[allow(dead_code)] // An alternative is to have a pretend.rs like `serde` does https://github.com/serde-rs/serde/blob/master/serde_derive/src/pretend.rs
     pub(crate) fn new((display, ext): (&str, Option<&str>)) -> Self {
         Self {
             display: FieldDisplay::new(display),

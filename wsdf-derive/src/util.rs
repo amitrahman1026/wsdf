@@ -280,6 +280,7 @@ mod test_case_convert {
 }
 
 /// A helper trait to "collapse" vectors of Expr, Stmt, etc. into a single `TokenStream`.
+#[allow(dead_code)]
 pub(crate) trait StreamTokens {
     fn streamify(self) -> proc_macro2::TokenStream;
 }
