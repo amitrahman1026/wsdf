@@ -66,7 +66,7 @@ More flexible decoding for enums
         Unknown,
     }
 
-    Suppose we implement From<u8> for Size. Maybe we can come up with some way
+    Suppose we implement From<u8> for Side. Maybe we can come up with some way
     to support the above kind of syntax?
 
 Support multiple derive(Protocol) in one lib

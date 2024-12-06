@@ -12,7 +12,7 @@ fn main() {
     }
 
     let bindings_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("bindings.rs");
-    
+
     // Generate fresh bindings when this crate is used for the first time
     if !bindings_path.exists() || cfg!(feature = "bindgen") {
         generate_bindings();
