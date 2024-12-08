@@ -1,4 +1,17 @@
-use wsdf::protocol;
+use wsdf::{protocol, version};
+#[no_mangle]
+#[used]
+static plugin_version: [std::ffi::c_char; 6usize] = [48i8, 46i8, 48i8, 46i8, 49i8, 0i8];
+#[no_mangle]
+#[used]
+static plugin_want_major: std::ffi::c_int = 4;
+#[no_mangle]
+#[used]
+static plugin_want_minor: std::ffi::c_int = 4;
+#[no_mangle]
+pub extern "C" fn plugin_describe() -> u32 {
+    wsdf::epan_sys::WS_PLUGIN_DESC_EPAN
+}
 const __WSDF_HF_INDICES: ::std::thread::LocalKey<std::cell::RefCell<wsdf::HfIndices>> = {
     #[inline]
     fn __init() -> std::cell::RefCell<wsdf::HfIndices> {

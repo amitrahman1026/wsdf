@@ -136,13 +136,13 @@ pub fn version(input: TokenStream) -> TokenStream {
     let version_info = quote! {
         #[no_mangle]
         #[used]
-        static PLUGIN_VERSION: [std::ffi::c_char; #nr_chars] = [#(#ver_str),*];
+        static plugin_version: [std::ffi::c_char; #nr_chars] = [#(#ver_str),*];
         #[no_mangle]
         #[used]
-        static PLUGIN_WANT_MAJOR: std::ffi::c_int = #ws_major_ver;
+        static plugin_want_major: std::ffi::c_int = #ws_major_ver;
         #[no_mangle]
         #[used]
-        static PLUGIN_WANT_MINOR: std::ffi::c_int = #ws_minor_ver;
+        static plugin_want_minor: std::ffi::c_int = #ws_minor_ver;
 
         #[no_mangle]
         pub extern "C" fn plugin_describe() -> u32 {
