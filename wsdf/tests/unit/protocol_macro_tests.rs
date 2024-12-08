@@ -18,13 +18,31 @@ mod test_protocol_plugin_registration_capi {
     }
 
     #[test]
-    fn test_protocol_registration_capi() {
+    fn test_plugin_registration_capi() {
         let expanded = get_expanded_code_string(EXPANDED_FILE_PATH);
 
+        // Minimally required plugin registratino symbols such that a dylib
+        // can be recognised as a plugin
         assert_wireshark_api!(expanded, "plugin_register");
         assert_wireshark_api!(expanded, "plugin_want_major");
         assert_wireshark_api!(expanded, "plugin_want_minor");
         assert_wireshark_api!(expanded, "plugin_register");
         assert_wireshark_api!(expanded, "plugin_describe");
+        assert_wireshark_api!(expanded, "proto_register_plugin");
+    }
+
+    // Currently, the basic protocol registration is coupled tightly with creating a plugin
+    #[test]
+    fn test_protocol_registration_capi() {
+        let expanded = get_expanded_code_string(EXPANDED_FILE_PATH);
+
+        // Minimally required protocol registration symbols
+
+        // This is the field where proto_register_XXXX is set, when called, creates a
+        // unique protocol number for dissector
+        assert_wireshark_api!(expanded, "register_protoinfo");
+        // This sets the proto_reg_handoff function which gives a handle to your protocol dissector,
+        // allowing it to be called by wireshark
+        assert_wireshark_api!(expanded, "register_handoff");
     }
 }
