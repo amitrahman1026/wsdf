@@ -22,5 +22,9 @@ mod test_protocol_plugin_registration_capi {
         let expanded = get_expanded_code_string(EXPANDED_FILE_PATH);
 
         assert_wireshark_api!(expanded, "plugin_register");
+        assert_wireshark_api!(expanded, "plugin_want_major");
+        assert_wireshark_api!(expanded, "plugin_want_minor");
+        assert_wireshark_api!(expanded, "plugin_register");
+        assert_wireshark_api!(expanded, "plugin_describe");
     }
 }
