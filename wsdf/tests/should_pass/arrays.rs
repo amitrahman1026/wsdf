@@ -1,8 +1,7 @@
 #![allow(dead_code)]
-
 // Tests that array fields can compile
 
-use wsdf::*;
+use wsdf::{protocol, version, Dissect, Proto};
 version!("0.0.1", 4, 4);
 protocol!(ProtoFoo);
 
