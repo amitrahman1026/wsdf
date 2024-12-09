@@ -1,30 +1,30 @@
 #![allow(dead_code)]
-
 // Tests that variants of unit tuple with primitive types work
 
-use wsdf::*;
+use wsdf::{protocol, tap::FieldsLocal, version, Dissect, Proto};
+version!("0.0.1", 4, 4);
+protocol!(ProtoFoo);
 
-#[derive(Protocol)]
+#[derive(Proto, Dissect)]
 #[wsdf(decode_from = "moldudp.payload")]
 struct ProtoFoo {
+    #[wsdf(save)]
     typ: u8,
-    #[wsdf(dispatch_field = "typ")]
+    #[wsdf(get_variant = "get_bar_variant")]
     bar: Bar,
 }
 
-#[derive(ProtocolField)]
+#[derive(Dissect)]
 enum Bar {
     Foo(u8),
     Qux(Qux),
 }
 
-impl Bar {
-    fn dispatch_typ(_typ: &u8) -> usize {
-        unimplemented!()
-    }
+fn get_bar_variant(FieldsLocal(_fields): FieldsLocal) -> &'static str {
+    unimplemented!();
 }
 
-#[derive(ProtocolField)]
+#[derive(Dissect)]
 struct Qux {
     baz: u8,
 }
