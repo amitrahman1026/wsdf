@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+
 // Tests that the display meta item accepts a bitwise OR
 
 use wsdf::{protocol, version, Dissect, Proto};
