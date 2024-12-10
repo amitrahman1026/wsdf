@@ -1,5 +1,6 @@
 #![allow(dead_code)]
-// Tests that variants of unit tuple with primitive types work
+
+// Tests that helper functions can be used to decode enum variants
 
 use wsdf::{protocol, tap::FieldsLocal, version, Dissect, Proto};
 version!("0.0.1", 4, 4);

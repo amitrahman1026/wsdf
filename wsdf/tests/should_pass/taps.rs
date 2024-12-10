@@ -1,20 +1,23 @@
 #![allow(dead_code)]
 
-use wsdf::tap::*;
-use wsdf::*;
+use wsdf::tap::{Field, Fields, Offset, Packet, PacketNanos};
+use wsdf::{protocol, Dissect, Proto};
 
-#[derive(ProtocolField)]
-struct Foo {
+protocol!(ProtoFoo);
+
+#[derive(Proto, Dissect)]
+#[wsdf(decode_from = "moldudp.payload")]
+struct ProtoFoo {
     #[wsdf(tap = ["f", "g", "h", "i", "j", "k"])]
     x: u8,
-    // Just check that taps work for non-primitive types too.
-    #[wsdf(len_field = "x", tap = ["f", "g3"])]
+    // Check that taps work for non-primitive types too.
+    #[wsdf(bytes, len_field = "x", tap = ["f", "g3"])]
     xs: Vec<u8>,
     #[wsdf(tap = ["f", "g2"])]
     bar: Bar,
 }
 
-#[derive(ProtocolField)]
+#[derive(Dissect)]
 struct Bar(u16);
 
 fn f() {}
