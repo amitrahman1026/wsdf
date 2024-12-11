@@ -2,7 +2,7 @@
 
 use wsdf::*;
 
-#[derive(Protocol)]
+#[derive(Proto)]
 #[wsdf(foo = "bar")] // Unknown meta item
 struct MyProtocol {
     foo: u32,

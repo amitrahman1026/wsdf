@@ -112,7 +112,8 @@ pub(crate) enum SubdissectorTableType {
     Unknown,
 }
 
-/// The subdissector table to register with.
+/// The dissector table where subdissectors you want to call are registered.
+/// For more information https://gitlab.com/wireshark/wireshark/blob/ccd96c6f65ac507b8f2785385f31b874b3459f6b/doc/README.dissector#L2339
 #[derive(Debug, Clone)]
 pub(crate) enum DecodeFrom {
     DecodeAs(String),

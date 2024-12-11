@@ -1,0 +1,14 @@
+error: only structs can derive Proto
+ --> tests/compile_tests/should_fail/union.rs:6:1
+  |
+6 | / union MyUnion {
+7 | |     f1: u32,
+8 | |     f2: f32,
+9 | | }
+  | |_^
+
+error: #[derive(Dissect)] cannot be used on unions
+ --> tests/compile_tests/should_fail/union.rs:6:1
+  |
+6 | union MyUnion {
+  | ^^^^^

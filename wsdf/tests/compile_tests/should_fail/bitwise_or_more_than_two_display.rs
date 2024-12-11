@@ -2,7 +2,8 @@
 
 use wsdf::*;
 
-#[derive(Protocol)]
+protocol!(ProtoFoo);
+#[derive(Proto, Dissect)]
 #[wsdf(decode_from = "moldudp.payload")]
 struct ProtoFoo {
     bar: u64,

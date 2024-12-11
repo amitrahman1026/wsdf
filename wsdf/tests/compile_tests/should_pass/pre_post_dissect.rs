@@ -1,14 +1,16 @@
 #![allow(dead_code)]
 
-use wsdf::{Protocol, ProtocolField};
+use wsdf::{protocol, Dissect, Proto};
 
-#[derive(Protocol)]
+protocol!(ProtoFoo);
+
+#[derive(Proto, Dissect)]
 #[wsdf(decode_from = "udp.port", pre_dissect = "f", post_dissect = "g")]
-struct Foo {
+struct ProtoFoo {
     bar: Bar,
 }
 
-#[derive(ProtocolField)]
+#[derive(Dissect)]
 #[wsdf(pre_dissect = "f", post_dissect = ["f", "g"])]
 struct Bar(u16);
 

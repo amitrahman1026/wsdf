@@ -2,16 +2,18 @@
 
 // Tests that nested array fields can compile
 
-use wsdf::*;
+use wsdf::{protocol, version, Dissect, Proto};
+version!("0.0.1", 4, 4);
+protocol!(ProtoFoo);
 
-#[derive(Protocol)]
+#[derive(Proto, Dissect)]
 #[wsdf(decode_from = "moldudp.payload")]
 struct ProtoFoo {
     bar: [[u64; 10]; 10],
     baz: [[Bar; 10]; 10],
 }
 
-#[derive(ProtocolField)]
+#[derive(Dissect)]
 struct Bar {
     qux: u64,
 }

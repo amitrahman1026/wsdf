@@ -2,9 +2,11 @@
 
 // Tests that the display meta item accepts a bitwise OR
 
-use wsdf::*;
+use wsdf::{protocol, version, Dissect, Proto};
+version!("0.0.1", 4, 4);
+protocol!(ProtoFoo);
 
-#[derive(Protocol)]
+#[derive(Proto, Dissect)]
 #[wsdf(decode_from = "moldudp.payload")]
 struct ProtoFoo {
     bar: u64,
