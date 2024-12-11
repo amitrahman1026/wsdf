@@ -95,7 +95,7 @@ impl Parse for VersionMacroInput {
 /// The following usage declares a plugin version of 0.0.1, built for wireshark version 4.4.x.
 ///
 /// ```
-/// use wsdf_derive::version;
+/// use wsdf::version;
 /// version!("0.0.1", 4, 4);
 /// ```
 ///
@@ -103,6 +103,8 @@ impl Parse for VersionMacroInput {
 /// generated. This can be one of: Dissector, FileType, Codec, Epan, TapListener, DFilter.
 ///
 ///```ignore
+/// use wsdf::version;
+///
 /// // Default to Epan type plugin
 /// version!("0.0.1", 4, 4);
 ///
