@@ -698,10 +698,10 @@ pub mod tap {
 
     /// The current field, if any. The absence of a value is represented by `Field(())`.
     ///
-    /// ```ignore
+    /// ```
     /// # use wsdf::tap::Field;
-    /// # use wsdf::ProtocolField;
-    /// #[derive(ProtocolField)]
+    /// # use wsdf::Dissect;
+    /// #[derive(Dissect)]
     /// struct MyProto {
     ///     #[wsdf(tap = "log_port")]
     ///     src_port: u16,
@@ -2308,14 +2308,12 @@ mod test_with_dummy_proto {
 
 #[cfg(test)]
 mod compile_tests {
-    #[ignore] // Pending test updates in next PR
     #[test]
     fn run_all() {
         let t = trybuild::TestCases::new();
 
-        t.pass("tests/simple/*.rs");
-        t.pass("tests/should_pass/*.rs");
-
-        t.compile_fail("tests/should_fail/*.rs");
+        t.pass("tests/compile_tests/simple/*.rs");
+        t.pass("tests/compile_tests/should_pass/*.rs");
+        t.compile_fail("tests/compile_tests/should_fail/*.rs");
     }
 }

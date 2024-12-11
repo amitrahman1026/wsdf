@@ -1,5 +1,5 @@
 error[E0605]: non-primitive cast: `()` as `usize`
- --> tests/should_fail/repeat_based_on_vector.rs:7:17
+ --> tests/compile_tests/should_fail/invalid_len_field.rs:7:17
   |
 7 | #[derive(Proto, Dissect)]
   |                 ^^^^^^^ an `as` expression can only be used to convert between primitive types or to coerce to a specific trait object

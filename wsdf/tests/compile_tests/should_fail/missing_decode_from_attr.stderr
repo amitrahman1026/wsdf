@@ -1,5 +1,5 @@
 error: missing `decode_from` attribute
- --> tests/should_fail/missing_container_attr.rs:6:8
+ --> tests/compile_tests/should_fail/missing_decode_from_attr.rs:6:8
   |
 6 | struct MyProtocol {
   |        ^^^^^^^^^^

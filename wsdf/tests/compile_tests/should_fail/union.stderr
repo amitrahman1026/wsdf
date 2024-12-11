@@ -1,5 +1,5 @@
 error: only structs can derive Proto
- --> tests/should_fail/union.rs:6:1
+ --> tests/compile_tests/should_fail/union.rs:6:1
   |
 6 | / union MyUnion {
 7 | |     f1: u32,
@@ -8,7 +8,7 @@ error: only structs can derive Proto
   | |_^
 
 error: #[derive(Dissect)] cannot be used on unions
- --> tests/should_fail/union.rs:6:1
+ --> tests/compile_tests/should_fail/union.rs:6:1
   |
 6 | union MyUnion {
   | ^^^^^
