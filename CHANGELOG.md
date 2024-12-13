@@ -33,6 +33,7 @@ Types of changes:
 - Rust workspace resolver version '2' is added.
 - Added option to specify type of wireshark plugin created, with a fallback to Epan type plugin
 - Added support for wsdf generated plugins to load correctly on macOS
+- Added `Proto`, `Dissect` traits that greatly simplify internal data model for dissectors as teh basis for the next release
 
 ### Changed
 
@@ -41,6 +42,9 @@ Types of changes:
 - `#[derive(Protocol)]` will now correctly register dissector protocols with unique `proto_register_xxx` in line with breaking wireshark plugin API changes since release 4.2.x
 - `plugin_describe()` will now be implemented to properly build a plugin since 4.2.x
 
+### Removed
+
+- Deprecated [0.1.0]'s brittle `Protocol`, `ProtocolField` based API
 
 ## [0.1.0] - 2015-08-04
 
