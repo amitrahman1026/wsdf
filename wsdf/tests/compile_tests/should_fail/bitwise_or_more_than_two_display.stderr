@@ -1,0 +1,22 @@
+error: expected a string literal
+  --> tests/compile_tests/should_fail/bitwise_or_more_than_two_display.rs:10:22
+   |
+10 |     #[wsdf(display = "SEP_COLON" | "BASE_SHOW_ASCII_PRINTABLE" | "SEP_SPACE")]
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0277]: the trait bound `ProtoFoo: wsdf::Dissect<'_, ()>` is not satisfied
+ --> tests/compile_tests/should_fail/bitwise_or_more_than_two_display.rs:8:8
+  |
+8 | struct ProtoFoo {
+  |        ^^^^^^^^ the trait `wsdf::Dissect<'_, ()>` is not implemented for `ProtoFoo`
+  |
+  = help: the following other types implement trait `wsdf::Dissect<'tvb, MaybeBytes>`:
+            `&[T]` implements `wsdf::Dissect<'tvb, ()>`
+            `&[T]` implements `wsdf::Dissect<'tvb, [u8]>`
+            `&[u8]` implements `wsdf::Dissect<'tvb, [u8]>`
+            `()` implements `wsdf::Dissect<'_, ()>`
+            `Vec<T>` implements `wsdf::Dissect<'tvb, ()>`
+            `Vec<T>` implements `wsdf::Dissect<'tvb, [u8]>`
+            `Vec<u8>` implements `wsdf::Dissect<'tvb, [u8]>`
+            `[T; N]` implements `wsdf::Dissect<'tvb, ()>`
+          and $N others

@@ -2,7 +2,7 @@
 
 use wsdf::*;
 
-#[derive(Protocol)]
+#[derive(Proto)]
 struct MyProtocol {
     foo: u32,
 }

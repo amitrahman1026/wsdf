@@ -698,10 +698,10 @@ pub mod tap {
 
     /// The current field, if any. The absence of a value is represented by `Field(())`.
     ///
-    /// ```ignore
+    /// ```
     /// # use wsdf::tap::Field;
-    /// # use wsdf::ProtocolField;
-    /// #[derive(ProtocolField)]
+    /// # use wsdf::Dissect;
+    /// #[derive(Dissect)]
     /// struct MyProto {
     ///     #[wsdf(tap = "log_port")]
     ///     src_port: u16,
@@ -2181,7 +2181,7 @@ where
 #[cfg(test)]
 mod test_with_dummy_proto {
     use super::*;
-    use std::sync::Once;
+    use std::sync::{atomic::AtomicI32, atomic::Ordering, Once};
 
     macro_rules! cstr {
         ($x:expr) => {
@@ -2190,23 +2190,24 @@ mod test_with_dummy_proto {
     }
 
     static INIT_DUMMY_PROTOCOL: Once = Once::new();
-    static mut DUMMY_PROTOCOL_ID: c_int = -1;
+    static DUMMY_PROTOCOL_ID: AtomicI32 = AtomicI32::new(-1);
 
     /// Registers a dummy protocol with wireshark.
     fn init_proto() {
         INIT_DUMMY_PROTOCOL.call_once(|| unsafe {
-            DUMMY_PROTOCOL_ID = epan_sys::proto_register_protocol(
+            let proto_id = epan_sys::proto_register_protocol(
                 cstr!("Dummy Protocol"),
                 cstr!("Dummy Protocol"),
                 cstr!("dummy_proto"),
             );
-            assert_ne!(DUMMY_PROTOCOL_ID, -1);
+            assert_ne!(proto_id, -1);
+            DUMMY_PROTOCOL_ID.store(proto_id, Ordering::SeqCst);
         });
     }
 
     fn get_dummy_proto_reg_args() -> RegisterArgs<'static> {
         RegisterArgs {
-            proto_id: unsafe { DUMMY_PROTOCOL_ID },
+            proto_id: DUMMY_PROTOCOL_ID.load(Ordering::SeqCst),
             name: cstr!("Dummy Protocol"),
             prefix: "dummy_proto",
             blurb: std::ptr::null(),
@@ -2307,14 +2308,12 @@ mod test_with_dummy_proto {
 
 #[cfg(test)]
 mod compile_tests {
-    #[ignore] // Pending test updates in next PR
     #[test]
     fn run_all() {
         let t = trybuild::TestCases::new();
 
-        t.pass("tests/simple/*.rs");
-        t.pass("tests/should_pass/*.rs");
-
-        t.compile_fail("tests/should_fail/*.rs");
+        t.pass("tests/compile_tests/simple/*.rs");
+        t.pass("tests/compile_tests/should_pass/*.rs");
+        t.compile_fail("tests/compile_tests/should_fail/*.rs");
     }
 }

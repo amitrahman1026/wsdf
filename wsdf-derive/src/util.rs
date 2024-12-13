@@ -14,7 +14,7 @@ pub(crate) fn make_err<T>(tok: &impl Spanned, msg: &str) -> Result<T, syn::Error
 /// # Example
 ///
 /// ```ignore
-/// extract_lit!(nv, Bool, "expected a boolean literal")?;
+/// get_lit!(nv, Bool, "expected a boolean literal")?;
 /// ```
 macro_rules! get_lit {
     ($($expr:ident).+, $lit_ty:ident, $err:literal $(,)?) => {

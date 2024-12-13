@@ -41,6 +41,7 @@ Types of changes:
 - The `tvb_get_guintX` and `tvb_get_gintX` functions in the tvbuff API has been renamed to `tvb_get_uintX` and `tvb_get_intX` (the GLib-style "g" has been removed). The old-style names have been deprecated.
 - `#[derive(Protocol)]` will now correctly register dissector protocols with unique `proto_register_xxx` in line with breaking wireshark plugin API changes since release 4.2.x
 - `plugin_describe()` will now be implemented to properly build a plugin since 4.2.x
+- Updated all of the test suites to reflect the new API changes, removed tests that are no longer relevant to new dissection model
 
 ### Removed
 
