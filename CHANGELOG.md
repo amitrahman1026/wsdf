@@ -34,6 +34,7 @@ Types of changes:
 - Added option to specify type of wireshark plugin created, with a fallback to Epan type plugin
 - Added support for wsdf generated plugins to load correctly on macOS
 - Added `Proto`, `Dissect` traits that greatly simplify internal data model for dissectors as teh basis for the next release
+- Added support for modifying "info" column
 
 ### Changed
 

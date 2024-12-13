@@ -148,31 +148,6 @@ Collect more errors before giving up
     our functions, which holds a list of all errors encountered. That way, we
     can report as many errors as possible in one go.
 
-Support adding stuff in columns
-
-    Wireshark has an "info" column (COL_INFO) where you can write arbitrary
-    stuff. Currently, we do not have a way to set what goes on there.
-
-    One way is to expose some methods on ProtocolField which users can call to
-    add stuff to the info column. These methods can be called inside taps,
-    decode_withs, or whatever.
-
-    #[derive(ProtocolField)]
-    struct MyProto {
-        #[wsdf(tap = "tap_fn")]
-        src_port: u16,
-    }
-
-    fn tap_fn(Field(x): Field) {
-        // perhaps something like this
-        MyProto::add_to_col(&format!("Source Port={x});
-    }
-
-    See
-    https://www.wireshark.org/docs/wsdg_html_chunked/ChDissectAdd.html#_improving_the_dissection_information
-    for how the COL_INFO can be used from C.
-
-
 Check attributes validity
 
     Currently, we don't have an explicit step in the codegen process which
