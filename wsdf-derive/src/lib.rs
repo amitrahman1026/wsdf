@@ -424,7 +424,7 @@ fn derive_proto_impl(input: &syn::DeriveInput) -> syn::Result<syn::ItemImpl> {
                                 etts: &etts,
                                 dtables: &dtables,
                                 tvb,
-                                pinfo,
+                                pinfo : wsdf::tap::PacketInfo(pinfo),
                                 proto_root: tree,
                                 data: &tvb_buf,
                                 prefix: #proto_filter,

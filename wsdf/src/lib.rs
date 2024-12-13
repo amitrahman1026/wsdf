@@ -687,7 +687,7 @@ pub mod tap {
         pub field: T,
         pub fields: &'a FieldsStore<'a>,
         pub fields_local: &'a FieldsStore<'a>,
-        pub pinfo: *mut epan_sys::_packet_info,
+        pub pinfo: PacketInfo,
         pub packet: &'a [u8],
         pub offset: usize,
     }
@@ -721,6 +721,17 @@ pub mod tap {
     pub struct PacketNanos(pub i64);
     /// Raw bytes of the packet.
     pub struct Packet<'a>(pub &'a [u8]);
+    /// Wrapper around the `packet_info` structure to allow us to modify the info col displayed in wireshark
+    ///
+    /// set_col_info()      // Replace entire info
+    ///
+    /// append_col_info()   // Add to existing info
+    ///
+    /// clear_col_info()    // Clear info
+    ///
+    /// The `Udp` protocol implmentation example gives a good overview on usage of this and various other `tap` structs
+    #[derive(Clone, Copy)]
+    pub struct PacketInfo(pub *mut epan_sys::_packet_info);
     /// Current offset into the packet.
     ///
     /// You probably want to use this in combination with [`Packet`] to index and slice the packet
@@ -735,7 +746,7 @@ pub mod tap {
 
     impl<T: Clone> FromContext<'_, T> for PacketNanos {
         fn from_ctx(ctx: &Context<T>) -> Self {
-            let abs_ts = unsafe { (*ctx.pinfo).abs_ts };
+            let abs_ts = unsafe { (*ctx.pinfo.0).abs_ts };
             Self(abs_ts.secs * 1e9 as i64 + abs_ts.nsecs as i64)
         }
     }
@@ -755,6 +766,12 @@ pub mod tap {
     impl<'a, T: Clone> FromContext<'a, T> for Packet<'a> {
         fn from_ctx(ctx: &Context<'a, T>) -> Self {
             Self(ctx.packet)
+        }
+    }
+
+    impl<T: Clone> FromContext<'_, T> for PacketInfo {
+        fn from_ctx(ctx: &Context<T>) -> Self {
+            ctx.pinfo
         }
     }
 
@@ -829,6 +846,29 @@ pub mod tap {
         H: Handler<'a, (), Args, &'static str>,
     {
         handler.call(ctx)
+    }
+
+    // Explosing some convenient ways to access and modify the info column and compose custom information
+    impl PacketInfo {
+        pub fn set_col_info(&self, text: &str) {
+            unsafe {
+                let cstr = std::ffi::CString::new(text).unwrap();
+                epan_sys::col_set_str((*self.0).cinfo, epan_sys::COL_INFO as _, cstr.as_ptr());
+            }
+        }
+
+        pub fn append_col_info(&self, text: &str) {
+            unsafe {
+                let cstr = Box::leak(std::ffi::CString::new(text).unwrap().into_boxed_c_str());
+                epan_sys::col_append_str((*self.0).cinfo, epan_sys::COL_INFO as _, cstr.as_ptr());
+            }
+        }
+
+        pub fn clear_col_info(&self) {
+            unsafe {
+                epan_sys::col_clear((*self.0).cinfo, epan_sys::COL_INFO as _);
+            }
+        }
     }
 }
 
@@ -958,7 +998,7 @@ pub struct DissectorArgs<'a, 'tvb> {
     pub dtables: &'tvb DissectorTables,
 
     pub tvb: *mut epan_sys::tvbuff,
-    pub pinfo: *mut epan_sys::packet_info,
+    pub pinfo: tap::PacketInfo,
     pub proto_root: *mut epan_sys::proto_tree,
 
     /// A slice of the entire packet.
@@ -1169,7 +1209,7 @@ impl DissectorArgs<'_, '_> {
     }
 
     pub fn call_data_dissector(&self) -> usize {
-        unsafe { epan_sys::call_data_dissector(self.tvb, self.pinfo, self.proto_root) as _ }
+        unsafe { epan_sys::call_data_dissector(self.tvb, self.pinfo.0, self.proto_root) as _ }
     }
 
     /// Retrieves the list_len field or panic and die.
@@ -1305,7 +1345,7 @@ impl<const N: usize> Subdissect<'_> for [u8; N] {
 fn dissector_try_uint(args: &DissectorArgs, name: &'static str, value: u32) -> usize {
     let subdissector = args.dtables.get(name).unwrap();
     unsafe {
-        epan_sys::dissector_try_uint(subdissector, value, args.tvb, args.pinfo, args.proto_root)
+        epan_sys::dissector_try_uint(subdissector, value, args.tvb, args.pinfo.0, args.proto_root)
             as _
     }
 }
@@ -1335,7 +1375,7 @@ impl SubdissectorKey for () {
         let subdissector = args.dtables.get(name).unwrap();
         // The `dissector_try_payload` function is used to call a Decode As dissector.
         unsafe {
-            epan_sys::dissector_try_payload(subdissector, args.tvb, args.pinfo, args.proto_root)
+            epan_sys::dissector_try_payload(subdissector, args.tvb, args.pinfo.0, args.proto_root)
                 as _
         }
     }
