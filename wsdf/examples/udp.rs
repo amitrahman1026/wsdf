@@ -29,7 +29,7 @@ struct Udp {
 }
 
 fn describe_src_port(pinfo: PacketInfo, Field(x): Field<u16>) {
-    pinfo.append_col_info(&format!("Source Port = {} | ", x));
+    pinfo.append_col_info(&format!("UDP Port {} → ", x));
 }
 
 // The tap system allows us to combine different types of field information:

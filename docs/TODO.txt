@@ -69,17 +69,6 @@ More flexible decoding for enums
     Suppose we implement From<u8> for Side. Maybe we can come up with some way
     to support the above kind of syntax?
 
-Support multiple derive(Protocol) in one lib
-
-    This should technically be possible. Since a lib is a plugin, and a plugin
-    should be allowed to have multiple dissectors.
-
-    The `plugin_register` symbol (currently generated once per
-    derive(Protocol)) is the "entry point" for Wireshark to register our
-    plugin. To support multiple protocols in one lib, we would need to generate
-    exactly one `plugin_register` per lib, and register all the protocols
-    within that function.
-
 Support Wireshark flag types
 
     This is pretty important, but we'll need to investigate a good syntax for

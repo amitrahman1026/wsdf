@@ -148,10 +148,11 @@
 //!
 //! The possible parameter types are:
 //!
-//! * [`Field`](tap::Field), the value of the field
-//! * [`Fields`](tap::Fields), a map of the fields encountered so far
-//! * [`Offset`](tap::Offset), the current byte offset into the packet
-//! * [`Packet`](tap::Packet), the raw bytes of the packet
+//! * [`Field`](tap::Field), the value of the field (see examples/udp.rs)
+//! * [`Fields`](tap::Fields), a map of the fields encountered so far (see examples/multi.rs - ARP implementation)
+//! * [`Offset`](tap::Offset), the current byte offset into the packet (see examples/multi.rs - ICMP implementation)
+//! * [`Packet`](tap::Packet), the raw bytes of the packet (see examples udp.rs and multi.rs)
+//! * [`PacketInfo`](tap::PacketInfo), exposes api to add information to "info" column (see examples udp.rs and multi.rs)
 //! * ...and more.
 //!
 //! Any permutation of the parameters is supported.
