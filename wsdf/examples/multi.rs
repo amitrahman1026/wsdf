@@ -29,7 +29,7 @@ struct Arp {
     #[wsdf(save, decode_with = "decode_arp_operation")]
     operation: u16,
     // Using bytes attribute for MAC addresses since they should be treated as a contiguous byte string
-    #[wsdf(bytes, save)]
+    #[wsdf(bytes, save, decode_with = "decode_mac_address")]
     sender_mac: [u8; 6],
     #[wsdf(save)]
     sender_ip: u32,
@@ -46,6 +46,13 @@ fn decode_arp_operation(Field(op): Field<u16>) -> String {
         2 => "REPLY".to_string(),
         _ => format!("Unknown({})", op),
     }
+}
+
+fn decode_mac_address(Field(mac): Field<&[u8]>) -> String {
+    mac.iter()
+        .map(|byte| format!("{:02x}", byte))
+        .collect::<Vec<_>>()
+        .join(":")
 }
 
 // Shows how to use FieldsLocal vs Fields:

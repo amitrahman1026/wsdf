@@ -54,12 +54,12 @@
 //! ```
 //!
 //! * The **[`version`] macro** specifies the plugin version as 0.0.1, built for Wireshark version
-//! 4.4.X. This information is required by Wireshark when loading the plugin.
+//!   4.4.X. This information is required by Wireshark when loading the plugin.
 //! * The **[`protocol`] macro** indicates that the `Udp` type should be registered as a protocol.
-//! Multiple types can be passed in like this.
+//!   Multiple types can be passed in like this.
 //! * The protocol itself should **derive [`Dissect`] and [`Proto`]**. Since this is UDP, the
-//! dissector is registered to the `"ip.proto"` dissector table, and also sets up the `"udp.port"`
-//! table. You will find more details about these attributes below.
+//!   dissector is registered to the `"ip.proto"` dissector table, and also sets up the `"udp.port"`
+//!   table. You will find more details about these attributes below.
 //!
 //! The crate type must be specified in `Cargo.toml`.
 //!
@@ -1542,7 +1542,7 @@ impl<'tvb> Primitive<'tvb, ()> for () {
                 args.tvb,
                 args.offset as _,
                 nr_bytes as _,
-                "%s: %s\0".as_ptr() as *const c_char,
+                c"%s: %s".as_ptr() as *const c_char,
                 field_name,
                 fmt.as_ptr(),
             );
