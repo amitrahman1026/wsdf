@@ -48,27 +48,6 @@ Handle all panics
     An alternative is to use Wireshark's "Expert Item" fields, and just
     highlight the error in Wireshark's UI instead of panicking.
 
-More flexible decoding for enums
-
-    Currently, enums must be "dispatched" based on the value of a previous
-    field. However, a user may wish to do this:
-
-    struct Order {
-        side: Side, // technically a u8
-        price: i32,
-        quantity: u64,
-    }
-
-    #[repr(u8)]
-    enum Side {
-        Bid,
-        Ask,
-        Unknown,
-    }
-
-    Suppose we implement From<u8> for Side. Maybe we can come up with some way
-    to support the above kind of syntax?
-
 Support Wireshark flag types
 
     This is pretty important, but we'll need to investigate a good syntax for
