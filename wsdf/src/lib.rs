@@ -54,12 +54,12 @@
 //! ```
 //!
 //! * The **[`version`] macro** specifies the plugin version as 0.0.1, built for Wireshark version
-//! 4.4.X. This information is required by Wireshark when loading the plugin.
+//!   4.4.X. This information is required by Wireshark when loading the plugin.
 //! * The **[`protocol`] macro** indicates that the `Udp` type should be registered as a protocol.
-//! Multiple types can be passed in like this.
+//!   Multiple types can be passed in like this.
 //! * The protocol itself should **derive [`Dissect`] and [`Proto`]**. Since this is UDP, the
-//! dissector is registered to the `"ip.proto"` dissector table, and also sets up the `"udp.port"`
-//! table. You will find more details about these attributes below.
+//!   dissector is registered to the `"ip.proto"` dissector table, and also sets up the `"udp.port"`
+//!   table. You will find more details about these attributes below.
 //!
 //! The crate type must be specified in `Cargo.toml`.
 //!
@@ -148,10 +148,11 @@
 //!
 //! The possible parameter types are:
 //!
-//! * [`Field`](tap::Field), the value of the field
-//! * [`Fields`](tap::Fields), a map of the fields encountered so far
-//! * [`Offset`](tap::Offset), the current byte offset into the packet
-//! * [`Packet`](tap::Packet), the raw bytes of the packet
+//! * [`Field`](tap::Field), the value of the field (see examples/udp.rs)
+//! * [`Fields`](tap::Fields), a map of the fields encountered so far (see examples/multi.rs - ARP implementation)
+//! * [`Offset`](tap::Offset), the current byte offset into the packet (see examples/multi.rs - ICMP implementation)
+//! * [`Packet`](tap::Packet), the raw bytes of the packet (see examples udp.rs and multi.rs)
+//! * [`PacketInfo`](tap::PacketInfo), exposes api to add information to "info" column (see examples udp.rs and multi.rs)
 //! * ...and more.
 //!
 //! Any permutation of the parameters is supported.
@@ -1541,7 +1542,7 @@ impl<'tvb> Primitive<'tvb, ()> for () {
                 args.tvb,
                 args.offset as _,
                 nr_bytes as _,
-                "%s: %s\0".as_ptr() as *const c_char,
+                c"%s: %s".as_ptr() as *const c_char,
                 field_name,
                 fmt.as_ptr(),
             );

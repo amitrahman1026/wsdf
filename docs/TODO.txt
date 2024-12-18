@@ -48,38 +48,6 @@ Handle all panics
     An alternative is to use Wireshark's "Expert Item" fields, and just
     highlight the error in Wireshark's UI instead of panicking.
 
-More flexible decoding for enums
-
-    Currently, enums must be "dispatched" based on the value of a previous
-    field. However, a user may wish to do this:
-
-    struct Order {
-        side: Side, // technically a u8
-        price: i32,
-        quantity: u64,
-    }
-
-    #[repr(u8)]
-    enum Side {
-        Bid,
-        Ask,
-        Unknown,
-    }
-
-    Suppose we implement From<u8> for Side. Maybe we can come up with some way
-    to support the above kind of syntax?
-
-Support multiple derive(Protocol) in one lib
-
-    This should technically be possible. Since a lib is a plugin, and a plugin
-    should be allowed to have multiple dissectors.
-
-    The `plugin_register` symbol (currently generated once per
-    derive(Protocol)) is the "entry point" for Wireshark to register our
-    plugin. To support multiple protocols in one lib, we would need to generate
-    exactly one `plugin_register` per lib, and register all the protocols
-    within that function.
-
 Support Wireshark flag types
 
     This is pretty important, but we'll need to investigate a good syntax for
