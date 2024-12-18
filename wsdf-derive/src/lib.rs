@@ -2,6 +2,7 @@
 
 use proc_macro::TokenStream;
 
+use proc_macro_error2::{abort, proc_macro_error};
 use quote::{format_ident, quote, ToTokens};
 use syn::parse::{Parse, ParseStream};
 use syn::parse_quote;
@@ -34,10 +35,7 @@ impl Parse for PluginType {
             "Epan" => Ok(PluginType::Epan),
             "TapListener" => Ok(PluginType::TapListener),
             "DFilter" => Ok(PluginType::DFilter),
-            _ => Err(syn::Error::new(
-                ident.span(),
-                "Invalid plugin type. Expected one of: Dissector, FileType, Codec, Epan, TapListener, DFilter",
-            )),
+            _ => abort!(ident,"Invalid plugin type. Expected one of: Dissector, FileType, Codec, Epan, TapListener, DFilter" )
         }
     }
 }
@@ -115,6 +113,7 @@ impl Parse for VersionMacroInput {
 /// version!("0.0.1", 4, 4, FileType);
 ///```
 ///
+#[proc_macro_error]
 #[proc_macro]
 pub fn version(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as VersionMacroInput);
@@ -156,73 +155,94 @@ pub fn version(input: TokenStream) -> TokenStream {
 }
 
 /// Derive macro for the `Dissect` trait.
+#[proc_macro_error]
 #[proc_macro_derive(Dissect, attributes(wsdf))]
 pub fn derive_dissect(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as syn::DeriveInput);
-    let ret = derive_dissect_impl(&input).unwrap_or_else(|e| e.to_compile_error());
-    ret.into()
+    derive_dissect_impl(&input).into()
 }
 
-fn derive_dissect_impl(input: &syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
-    let dissect_options = init_options::<ProtocolFieldOptions>(&input.attrs)?;
+fn derive_dissect_impl(input: &syn::DeriveInput) -> proc_macro2::TokenStream {
+    let dissect_options = match init_options::<ProtocolFieldOptions>(&input.attrs) {
+        Ok(opts) => opts,
+        Err(e) => abort!(input, "Invalid prootocol field options {}", e),
+    };
     match &input.data {
-        syn::Data::Struct(data) => {
-            let struct_info = StructInnards::from_fields(&data.fields)?;
-            let ret = derive_dissect_impl_struct(&input.ident, &dissect_options, &struct_info);
-            Ok(ret.to_token_stream())
-        }
-        syn::Data::Enum(data) => {
-            let mut new_struct_defs: Vec<syn::ItemStruct> = Vec::with_capacity(data.variants.len());
-            for variant in &data.variants {
-                // We'll cheat for enums. For each variant, we create a new struct, and then derive
-                // Dissect on that struct.
-
-                let pre_dissect = filter_for_meta_value(&variant.attrs, META_PRE_DISSECT)?;
-                let pre_dissect: syn::Attribute = parse_quote! {
-                    #[wsdf(pre_dissect = [#(#pre_dissect),*])]
-                };
-                let post_dissect = filter_for_meta_value(&variant.attrs, META_POST_DISSECT)?;
-                let post_dissect: syn::Attribute = parse_quote! {
-                    #[wsdf(post_dissect = [#(#post_dissect),*])]
-                };
-
-                let newtype_ident = format_ident!("__{}", variant.ident);
-                let fields = &variant.fields;
-
-                let struct_def: syn::ItemStruct = match fields {
-                    syn::Fields::Named(_) => parse_quote! {
-                        struct #newtype_ident #fields
-                    },
-                    syn::Fields::Unnamed(_) => parse_quote! {
-                        struct #newtype_ident #fields;
-                    },
-                    syn::Fields::Unit => parse_quote! {
-                        struct #newtype_ident;
-                    },
-                };
-                let struct_def = parse_quote! {
-                    #[derive(wsdf::Dissect)]
-                    #pre_dissect
-                    #post_dissect
-                    #struct_def
-                };
-                new_struct_defs.push(struct_def);
+        syn::Data::Struct(data) => match StructInnards::from_fields(&data.fields) {
+            Ok(struct_info) => {
+                derive_dissect_impl_struct(&input.ident, &dissect_options, &struct_info)
+                    .into_token_stream()
             }
+            Err(e) => abort!(data.fields, "Failed to process struct fields: {}", e),
+        },
+        syn::Data::Enum(data) => {
+            // We'll cheat for enums. For each variant, we create a new struct, and then derive
+            // Dissect on that struct.
+            let new_struct_defs: Vec<syn::ItemStruct> = data
+                .variants
+                .iter()
+                .map(|variant| {
+                    let pre_dissect = match filter_for_meta_value(&variant.attrs, META_PRE_DISSECT)
+                    {
+                        Ok(v) => v,
+                        Err(e) => abort!(variant, "Invalid pre_dissect attribute {}", e),
+                    };
+                    let pre_dissect: syn::Attribute = parse_quote! {
+                        #[wsdf(pre_dissect = [#(#pre_dissect),*])]
+                    };
 
-            let enum_data = Enum::new(&input.ident, &data.variants)?;
+                    let post_dissect =
+                        match filter_for_meta_value(&variant.attrs, META_POST_DISSECT) {
+                            Ok(v) => v,
+                            Err(e) => abort!(variant, "Invalid post_dissect attribute {}", e),
+                        };
+                    let post_dissect: syn::Attribute = parse_quote! {
+                        #[wsdf(post_dissect = [#(#post_dissect),*])]
+                    };
+
+                    let newtype_ident = format_ident!("__{}", variant.ident);
+                    let fields = &variant.fields;
+
+                    let struct_def: syn::ItemStruct = match fields {
+                        syn::Fields::Named(_) => parse_quote! {
+                            struct #newtype_ident #fields
+                        },
+                        syn::Fields::Unnamed(_) => parse_quote! {
+                            struct #newtype_ident #fields;
+                        },
+                        syn::Fields::Unit => parse_quote! {
+                            struct #newtype_ident;
+                        },
+                    };
+                    let struct_def = parse_quote! {
+                        #[derive(wsdf::Dissect)]
+                        #pre_dissect
+                        #post_dissect
+                        #struct_def
+                    };
+                    struct_def
+                })
+                .collect();
+
+            let enum_data = match Enum::new(&input.ident, &data.variants) {
+                Ok(data) => data,
+                Err(e) => abort!(data.variants, "Failed to process enum: {}", e),
+            };
             // And of course the actual implementation of Dissect for the enum type. It will call
             // into functions from the dummy structs we created.
             let actual_impl = derive_dissect_impl_enum(&enum_data);
 
-            Ok(quote! {
+            quote! {
                 #(#new_struct_defs)*
                 #actual_impl
-            })
+            }
         }
-        syn::Data::Union(data) => make_err(
-            &data.union_token,
-            "#[derive(Dissect)] cannot be used on unions",
-        ),
+        syn::Data::Union(data) => {
+            abort!(
+                data.union_token,
+                "#[derive(Dissect)] cannot be used on unions"
+            )
+        }
     }
 }
 
@@ -293,6 +313,7 @@ impl Parse for SelectedProtocols {
 /// #[wsdf(decode_from = [("ip.proto", 136)])]
 /// struct UdpLite { /* UDP-lite fields */ }
 /// ```
+#[proc_macro_error]
 #[proc_macro]
 pub fn protocol(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as SelectedProtocols);
@@ -340,6 +361,7 @@ pub fn protocol(input: TokenStream) -> TokenStream {
 }
 
 /// Derive macro for the `Proto` trait.
+#[proc_macro_error]
 #[proc_macro_derive(Proto, attributes(wsdf))]
 pub fn derive_proto(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as syn::DeriveInput);
