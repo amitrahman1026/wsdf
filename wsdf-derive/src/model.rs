@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use proc_macro_error2::{abort, emit_error};
 use quote::format_ident;
 use syn::{parse_quote, punctuated::Punctuated};
 
@@ -39,8 +40,8 @@ pub(crate) struct FieldMeta {
 impl StructInnards {
     pub(crate) fn from_fields(fields: &syn::Fields) -> syn::Result<Self> {
         match fields {
-            syn::Fields::Named(fields) => Self::from_fields_named(fields),
-            syn::Fields::Unnamed(fields) => Self::from_fields_unnamed(fields),
+            syn::Fields::Named(fields) => Ok(Self::from_fields_named(fields)),
+            syn::Fields::Unnamed(fields) => Ok(Self::from_fields_unnamed(fields)),
             syn::Fields::Unit => Ok(StructInnards::UnitTuple(UnitTuple(FieldMeta {
                 ty: parse_quote! { () },
                 docs: None,
@@ -50,38 +51,41 @@ impl StructInnards {
         }
     }
 
-    fn from_fields_named(fields: &syn::FieldsNamed) -> syn::Result<Self> {
-        let mut named_fields = Vec::new();
-        for field in &fields.named {
-            let ident = field.ident.clone().unwrap(); // safe since the fields are named
-            let options = init_options::<FieldOptions>(&field.attrs)?;
-            let docs = get_docs(&field.attrs);
-            let meta = FieldMeta {
-                ty: field.ty.clone(),
-                docs,
-                options,
-                subdissector_key_type: None,
-            };
-            named_fields.push(NamedField { ident, meta });
-        }
-        Ok(StructInnards::NamedFields {
-            fields: named_fields,
-        })
+    fn from_fields_named(fields: &syn::FieldsNamed) -> Self {
+        let fields: Vec<NamedField> = fields
+            .named
+            .iter()
+            .map(|field| {
+                let ident = field
+                    .ident
+                    .clone()
+                    .unwrap_or_else(|| abort!(field, "Named field must have an identifier"));
+                let options = init_options(&field.attrs);
+                let meta = FieldMeta {
+                    ty: field.ty.clone(),
+                    docs: get_docs(&field.attrs),
+                    options,
+                    subdissector_key_type: None,
+                };
+                NamedField { ident, meta }
+            })
+            .collect();
+        StructInnards::NamedFields { fields }
     }
 
-    fn from_fields_unnamed(fields: &syn::FieldsUnnamed) -> syn::Result<Self> {
+    fn from_fields_unnamed(fields: &syn::FieldsUnnamed) -> Self {
         if fields.unnamed.len() != 1 {
-            return make_err(fields, "expected only one field in tuple");
+            emit_error!(fields, "expected only one field in tuple");
         }
         let field = fields.unnamed.last().unwrap(); // safe since we checked there's exactly one
-        let options = init_options::<FieldOptions>(&field.attrs)?;
+        let options = init_options::<FieldOptions>(&field.attrs);
         let docs = get_docs(&field.attrs);
-        Ok(StructInnards::UnitTuple(UnitTuple(FieldMeta {
+        StructInnards::UnitTuple(UnitTuple(FieldMeta {
             ty: field.ty.clone(),
             docs,
             options,
             subdissector_key_type: None,
-        })))
+        }))
     }
 
     fn register_fields(&self) -> Vec<syn::Stmt> {
@@ -400,7 +404,9 @@ impl FieldMeta {
                 <() as wsdf::SubdissectorKey>::create_table(args_next.proto_id, #table_name, ws_indices.dtable);
             },
             Some(Subdissector::Table { table_name, .. }) => {
-                debug_assert!(self.subdissector_key_type.is_some());
+                if !self.subdissector_key_type.is_some() {
+                    abort!(self.subdissector_key_type, "here")
+                }
                 let key_type = self.subdissector_key_type.as_ref().unwrap();
                 parse_quote! {
                     <#key_type as wsdf::SubdissectorKey>::create_table(args.proto_id, #table_name, ws_indices.dtable);
@@ -784,7 +790,13 @@ fn assign_subdissector_key_types(fields: &[NamedField]) -> Vec<NamedField> {
                             }
                         }
                     }
-                    debug_assert!(new_meta.subdissector_key_type.is_some());
+                    // debug_assert!(new_meta.subdissector_key_type.is_some());
+                    if !new_meta.subdissector_key_type.is_some() {
+                        abort!(
+                            new_meta.subdissector_key_type,
+                            "unable to subdissect using this key"
+                        )
+                    }
                     new_meta
                 }
             };
@@ -873,7 +885,7 @@ impl<'a> Enum<'a> {
         let mut xs = Vec::with_capacity(variants.len());
 
         for variant in variants {
-            let options = init_options::<VariantOptions>(&variant.attrs)?;
+            let options = init_options::<VariantOptions>(&variant.attrs);
             xs.push(Variant {
                 data: variant,
                 options,
