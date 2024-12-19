@@ -2,25 +2,30 @@ use quote::{format_ident, quote};
 use syn::{parse_quote, punctuated::Punctuated};
 
 use crate::util::*;
+use proc_macro_error2::emit_error;
 
 /// Implement this for things which can extract options out of meta items.
 pub(crate) trait OptionBuilder {
-    fn add_option(&mut self, meta: &syn::Meta) -> syn::Result<()>;
+    fn add_option(&mut self, meta: &syn::Meta) -> ();
 }
 
 /// Initializes some set of options from a list of attributes. Note that each attribute may contain
 /// multiple meta items, but each meta item should map to exactly one option.
-pub(crate) fn init_options<T>(attrs: &[syn::Attribute]) -> syn::Result<T>
+pub(crate) fn init_options<T>(attrs: &[syn::Attribute]) -> T
 where
     T: OptionBuilder + Default,
 {
     let mut opts = T::default();
     // Not all attributes are wsdf attributes, so we need to filter them out first.
-    let meta_items = get_meta_items(get_wsdf_attrs(attrs).as_slice())?;
-    for meta in &meta_items {
-        opts.add_option(meta)?;
-    }
-    Ok(opts)
+    let meta_items = get_meta_items(get_wsdf_attrs(attrs).as_slice()).unwrap_or_else(|e| {
+        emit_error!(attrs.first().unwrap(), "Invalid attributes: {}", e);
+        vec![]
+    });
+    meta_items
+        .into_iter()
+        .for_each(|meta| opts.add_option(&meta));
+
+    opts
 }
 
 /// Options for the top level protocol.
@@ -144,209 +149,299 @@ impl DecodeFrom {
 }
 
 impl OptionBuilder for ProtocolOptions {
-    fn add_option(&mut self, meta: &syn::Meta) -> syn::Result<()> {
+    fn add_option(&mut self, meta: &syn::Meta) -> () {
         match meta {
-            syn::Meta::NameValue(nv) => match nv.path.get_ident() {
-                None => return make_err(meta, "expected identifier"),
-                Some(ident) => match ident.to_string().as_str() {
-                    META_DECODE_FROM => self.extract_decode_from(nv, meta)?,
+            syn::Meta::NameValue(nv) => {
+                let ident = match nv.path.get_ident() {
+                    Some(ident) => ident,
+                    None => {
+                        emit_error!(nv.path, "expected identifier");
+                        return;
+                    }
+                };
+
+                match ident.to_string().as_str() {
+                    META_DECODE_FROM => self.extract_decode_from(nv, meta),
                     META_PROTO_DESC => {
-                        let proto_desc = get_lit_str(&nv.value)?.value();
-                        self.proto_desc = Some(proto_desc);
+                        if let Some(lit) = get_lit_str(&nv.value) {
+                            self.proto_desc = Some(lit.value());
+                        }
                     }
                     META_PROTO_NAME => {
-                        let proto_name = get_lit_str(&nv.value)?.value();
-                        self.proto_name = Some(proto_name);
+                        if let Some(lit) = get_lit_str(&nv.value) {
+                            self.proto_name = Some(lit.value());
+                        }
                     }
                     META_PROTO_FILTER => {
-                        let proto_filter = get_lit_str(&nv.value)?.value();
-                        self.proto_filter = Some(proto_filter);
+                        if let Some(lit) = get_lit_str(&nv.value) {
+                            self.proto_filter = Some(lit.value());
+                        }
                     }
-                    // These meta items belong to ProtocolFieldOptions. But they may appear in
-                    // the same list of attributes, e.g.
-                    //
-                    // #[derive(Protocol)]
-                    // #[wsdf(decode_from = "udp.port", pre_dissect = "f")]
-                    // struct SomeProto {
-                    //   x: u16,
-                    // }
-                    //
-                    // Because we have Protocol : ProtocolField and they all share the same
-                    // #[wsdf(...)] look.
+                    // Pass through for shared attributes
                     META_PRE_DISSECT | META_POST_DISSECT => (),
-                    _ => return make_err(meta, "unrecognized attribute"),
-                },
-            },
-            _ => return make_err(meta, "unexpected meta item"),
-        };
-        Ok(())
+                    _ => emit_error!(ident, "unrecognized protocol attribute";
+                        help = "valid attributes are: decode_from, proto_desc, proto_name, proto_filter"
+                    ),
+                }
+            }
+            _ => emit_error!(meta, "unexpected attribute format";
+                help = "protocol attributes must be in name = value format"
+            ),
+        }
     }
 }
 
 impl OptionBuilder for ProtocolFieldOptions {
-    fn add_option(&mut self, meta: &syn::Meta) -> syn::Result<()> {
+    fn add_option(&mut self, meta: &syn::Meta) -> () {
         match meta {
             syn::Meta::NameValue(nv) => match nv.path.get_ident() {
-                None => return make_err(meta, "expected identifier"),
+                None => emit_error!(meta, "expected identifier"),
                 Some(ident) => match ident.to_string().as_str() {
-                    META_PRE_DISSECT => self.pre_dissect = parse_strings(&nv.value)?,
-                    META_POST_DISSECT => self.post_dissect = parse_strings(&nv.value)?,
+                    META_PRE_DISSECT => self.pre_dissect = parse_strings(&nv.value),
+                    META_POST_DISSECT => self.post_dissect = parse_strings(&nv.value),
                     // These meta items belong to ProtocolOptions. But they may appear in the same
                     // list of attributes.
                     META_PROTO_DESC | META_PROTO_NAME | META_PROTO_FILTER | META_DECODE_FROM => (),
-                    _ => return make_err(meta, "unrecognized attribute"),
+                    _ => emit_error!(meta, "unrecognized attribute"),
                 },
             },
-            _ => return make_err(meta, "unexpected meta item"),
+            _ => emit_error!(meta, "unexpected meta item"),
         }
-        Ok(())
     }
 }
 
 impl ProtocolOptions {
-    fn extract_decode_from(
-        &mut self,
-        nv: &syn::MetaNameValue,
-        meta: &syn::Meta,
-    ) -> Result<(), syn::Error> {
+    fn extract_decode_from(&mut self, nv: &syn::MetaNameValue, meta: &syn::Meta) -> () {
         let items = unpack_expr(&nv.value);
         for item in items {
             match unpack_expr(item).as_slice() {
-                [] => return make_err(meta, "expected at least one item"),
+                [] => {
+                    emit_error!(meta, "decode_from: expected at least one item";
+                        help = "use either \"name\" or (\"name\", port1, port2, ...)" // TODO: recheck this help statment
+                    );
+                }
+
                 [name] => {
-                    let decode_from = get_lit_str(name)?.value();
-                    self.decode_from.push(DecodeFrom::DecodeAs(decode_from));
+                    if let Some(lit) = get_lit_str(name) {
+                        self.decode_from.push(DecodeFrom::DecodeAs(lit.value()));
+                    }
                 }
                 [name, xs @ ..] => {
-                    let name = get_lit_str(name)?.value();
-                    let mut patterns: Vec<u32> = Vec::with_capacity(xs.len());
-                    for x in xs {
-                        let pattern = get_lit_int(x)?.base10_parse()?;
-                        patterns.push(pattern);
+                    // let name = get_lit_str(name).value();
+                    let table_name = match get_lit_str(name) {
+                        Some(lit) => lit.value(),
+                        None => continue, // error already emitted
+                    };
+
+                    let patterns: Vec<u32> = xs
+                        .iter()
+                        .filter_map(|x| {
+                            get_lit_int(x).and_then(|lit| match lit.base10_parse() {
+                                Ok(val) => Some(val),
+                                Err(e) => {
+                                    emit_error!(x, "invalid port number: {}", e;
+                                        help = "port numbers must be valid u32 integers"
+                                    );
+                                    None
+                                }
+                            })
+                        })
+                        .collect();
+
+                    if !patterns.is_empty() {
+                        self.decode_from
+                            .push(DecodeFrom::Uint(table_name, patterns));
                     }
-                    self.decode_from.push(DecodeFrom::Uint(name, patterns));
                 }
             }
         }
-        Ok(())
     }
 }
 
 impl OptionBuilder for FieldOptions {
-    fn add_option(&mut self, meta: &syn::Meta) -> syn::Result<()> {
+    fn add_option(&mut self, meta: &syn::Meta) -> () {
         match meta {
-            syn::Meta::Path(path) => match path.get_ident() {
-                None => return make_err(meta, "expected identifier"),
-                Some(ident) => match ident.to_string().as_str() {
+            syn::Meta::Path(path) => {
+                let ident = match path.get_ident() {
+                    Some(ident) => ident,
+                    None => {
+                        emit_error!(path, "expected identifier");
+                        return;
+                    }
+                };
+                match ident.to_string().as_str() {
                     META_HIDE => self.hidden = Some(true),
                     META_SAVE => self.save = Some(true),
                     META_BYTES => self.bytes = Some(true),
-                    _ => return make_err(meta, "unrecognized attribute"),
-                },
-            },
-            syn::Meta::NameValue(nv) => match nv.path.get_ident() {
-                None => return make_err(meta, "expected identifier"),
-                Some(ident) => match ident.to_string().as_str() {
+                    _ => emit_error!(path, "unrecognized attribute";
+                        help = "valid path attributes are: hide, save, bytes"
+                    ),
+                }
+            }
+
+            syn::Meta::NameValue(nv) => {
+                let ident = match nv.path.get_ident() {
+                    Some(ident) => ident,
+                    None => {
+                        emit_error!(nv.path, "expected identifier");
+                        return;
+                    }
+                };
+                match ident.to_string().as_str() {
                     META_HIDE => {
-                        let hidden = get_lit_bool(&nv.value)?.value;
-                        self.hidden = Some(hidden);
+                        if let Some(lit) = get_lit_bool(&nv.value) {
+                            self.hidden = Some(lit.value);
+                        }
                     }
                     META_SAVE => {
-                        let save = get_lit_bool(&nv.value)?.value;
-                        self.save = Some(save);
+                        if let Some(lit) = get_lit_bool(&nv.value) {
+                            self.save = Some(lit.value);
+                        }
                     }
                     META_LEN => {
-                        let len = get_lit_str(&nv.value)?.value();
-                        self.size_hint = Some(format_ident!("{}", len));
+                        if let Some(lit) = get_lit_str(&nv.value) {
+                            self.size_hint = Some(format_ident!("{}", lit.value()));
+                        }
                     }
                     META_WS_TYPE => {
-                        let ws_type = get_lit_str(&nv.value)?.value();
-                        self.ws_type = Some(ws_type);
+                        if let Some(lit) = get_lit_str(&nv.value) {
+                            self.ws_type = Some(lit.value());
+                        }
                     }
                     META_WS_ENC => {
-                        let ws_enc = get_lit_str(&nv.value)?.value();
-                        self.ws_enc = Some(ws_enc);
+                        if let Some(lit) = get_lit_str(&nv.value) {
+                            self.ws_enc = Some(lit.value());
+                        }
                     }
-                    META_WS_DISPLAY => self.extract_ws_display(nv)?,
+                    META_WS_DISPLAY => self.extract_ws_display(nv),
                     META_GET_VARIANT => {
-                        let get_variant = get_lit_str(&nv.value)?.value();
-                        let path = syn::parse_str::<syn::Path>(&get_variant)?;
-                        self.get_variant = Some(path);
+                        if let Some(lit) = get_lit_str(&nv.value) {
+                            match syn::parse_str::<syn::Path>(&lit.value()) {
+                                Ok(path) => self.get_variant = Some(path),
+                                Err(e) => emit_error!(lit, "invalid path for get_variant: {}", e;
+                                    help = "path should be a valid Rust path" // Rust function?
+                                ),
+                            }
+                        }
                     }
                     META_DECODE_WITH => {
-                        let decode_with = get_lit_str(&nv.value)?.value();
-                        self.decode_with = Some(syn::parse_str::<syn::Path>(&decode_with)?);
+                        if let Some(lit) = get_lit_str(&nv.value) {
+                            match syn::parse_str::<syn::Path>(&lit.value()) {
+                                Ok(path) => self.decode_with = Some(path),
+                                Err(e) => emit_error!(lit, "invalid path for decode_with: {}", e;
+                                    help = "path should be a valid Rust path" // Rust function here too?
+                                ),
+                            }
+                        }
                     }
-                    META_TAP => self.taps = parse_strings(&nv.value)?,
+                    META_TAP => {
+                        self.taps = parse_strings(&nv.value);
+                    }
                     META_CONSUME_WITH => {
-                        let consume_with = get_lit_str(&nv.value)?.value();
-                        let path = syn::parse_str::<syn::Path>(&consume_with)?;
-                        self.consume_with = Some(path);
+                        if let Some(lit) = get_lit_str(&nv.value) {
+                            match syn::parse_str::<syn::Path>(&lit.value()) {
+                                Ok(path) => self.consume_with = Some(path),
+                                Err(e) => emit_error!(lit, "invalid path for consume_with: {}", e;
+                                    help = "path should be a valid Rust path"
+                                ),
+                            }
+                        }
                     }
-                    META_SUBDISSECTOR => self.extract_subdissector(nv, meta)?,
+                    META_SUBDISSECTOR => self.extract_subdissector(nv, meta),
                     META_RENAME => {
-                        let rename = get_lit_str(&nv.value)?.value();
-                        self.rename = Some(rename);
+                        if let Some(lit) = get_lit_str(&nv.value) {
+                            self.rename = Some(lit.value());
+                        }
                     }
                     META_BYTES => {
-                        let bytes = get_lit_bool(&nv.value)?.value;
-                        self.bytes = Some(bytes);
+                        if let Some(lit) = get_lit_bool(&nv.value) {
+                            self.bytes = Some(lit.value);
+                        }
                     }
-                    _ => return make_err(meta, "unrecognized attribute"),
-                },
-            },
-            syn::Meta::List(_) => return make_err(meta, "unexpected meta item"),
+                    _ => emit_error!(ident, "unrecognized attribute";
+                        help = "valid name-value attributes are: hide, save, len, ws_type, etc."
+                    ),
+                }
+            }
+            syn::Meta::List(_) => emit_error!(meta, "unexpected list attribute";
+                help = "attributes should be either #[wsdf(name)] or #[wsdf(name = \"value\")]"
+            ),
         };
-        Ok(())
     }
 }
 
 impl FieldOptions {
-    fn extract_ws_display(&mut self, nv: &syn::MetaNameValue) -> Result<(), syn::Error> {
-        // Wireshark display is either a single string, or a "bitwise-OR" or two strings.
-        if let syn::Expr::Binary(syn::ExprBinary {
-            op: syn::BinOp::BitOr(..),
-            left,
-            right,
-            ..
-        }) = &nv.value
-        {
-            let display = get_lit_str(left)?.value();
-            let ext = get_lit_str(right)?.value();
+    fn extract_ws_display(&mut self, nv: &syn::MetaNameValue) {
+        match &nv.value {
+            syn::Expr::Binary(binary) => {
+                if !matches!(binary.op, syn::BinOp::BitOr(..)) {
+                    emit_error!(binary.op, "expected '|' operator";
+                        help = "display values can be combined with the '|' operator"
+                    );
+                    return;
+                }
 
-            let display = FieldDisplay::new(&display);
-            let ext = FieldDisplay::new(&ext);
+                let display = match get_lit_str(&binary.left) {
+                    Some(lit) => FieldDisplay::new(&lit.value()),
+                    None => return, // error already emitted by get_lit_str
+                };
 
-            self.ws_display = Some(FieldDisplayPair {
-                display,
-                ext: Some(ext),
-            });
-        } else {
-            let display = get_lit_str(&nv.value)?.value();
-            let display = FieldDisplay::new(&display);
-            self.ws_display = Some(FieldDisplayPair { display, ext: None });
+                let ext = match get_lit_str(&binary.right) {
+                    Some(lit) => FieldDisplay::new(&lit.value()),
+                    None => return, // error already emitted by get_lit_str
+                };
+
+                self.ws_display = Some(FieldDisplayPair {
+                    display,
+                    ext: Some(ext),
+                });
+            }
+            _ => {
+                // Single value case
+                if let Some(lit) = get_lit_str(&nv.value) {
+                    let display = FieldDisplay::new(&lit.value());
+                    self.ws_display = Some(FieldDisplayPair { display, ext: None });
+                }
+                // None case - error already emitted by get_lit_str
+            }
         }
-        Ok(())
     }
 
-    fn extract_subdissector(
-        &mut self,
-        nv: &syn::MetaNameValue,
-        meta: &syn::Meta,
-    ) -> Result<(), syn::Error> {
-        match unpack_expr(&nv.value).as_slice() {
-            [] => return make_err(meta, "expected at least one item"),
-            [decode_as] => {
-                let decode_as = get_lit_str(decode_as)?.value();
-                self.subdissector = Some(Subdissector::DecodeAs(decode_as));
-            }
-            [table_name, items @ ..] => {
-                let table_name = get_lit_str(table_name)?.value();
+    fn extract_subdissector(&mut self, nv: &syn::MetaNameValue, meta: &syn::Meta) {
+        let items = unpack_expr(&nv.value);
 
-                let mut fields = Vec::with_capacity(items.len());
-                for item in items {
-                    let field = get_lit_str(item)?.value();
-                    fields.push(format_ident!("{}", field));
+        match items.as_slice() {
+            [] => {
+                emit_error!(meta, "expected at least one item for subdissector";
+                    help = "use either a decode_as string or a table name with fields"
+                );
+            }
+            [single] => {
+                // DecodeAs case
+                if let Some(lit) = get_lit_str(single) {
+                    self.subdissector = Some(Subdissector::DecodeAs(lit.value()));
+                }
+                // None case - error already emitted
+            }
+            [table_name, fields @ ..] => {
+                // Table case
+                let table_name = match get_lit_str(table_name) {
+                    Some(lit) => lit.value(),
+                    None => return, // error already emitted
+                };
+
+                let fields: Vec<_> = fields
+                    .iter()
+                    .filter_map(|item| {
+                        get_lit_str(item).map(|lit| format_ident!("{}", lit.value()))
+                    })
+                    .collect();
+
+                if fields.is_empty() {
+                    emit_error!(meta, "no valid fields provided for subdissector table";
+                        help = "table requires at least one field identifier"
+                    );
+                    return;
                 }
 
                 self.subdissector = Some(Subdissector::Table {
@@ -356,28 +451,42 @@ impl FieldOptions {
                 });
             }
         }
-        Ok(())
     }
 }
 
 impl OptionBuilder for VariantOptions {
-    fn add_option(&mut self, meta: &syn::Meta) -> syn::Result<()> {
+    fn add_option(&mut self, meta: &syn::Meta) {
         match meta {
-            syn::Meta::NameValue(nv) => match nv.path.get_ident() {
-                None => return make_err(meta, "expected identifier"),
-                Some(ident) => match ident.to_string().as_str() {
-                    META_RENAME => {
-                        let rename = get_lit_str(&nv.value)?.value();
-                        self.rename = Some(rename);
+            syn::Meta::NameValue(nv) => {
+                let ident = match nv.path.get_ident() {
+                    Some(ident) => ident,
+                    None => {
+                        emit_error!(nv.path, "expected identifier");
+                        return;
                     }
-                    META_PRE_DISSECT => self.pre_dissect = parse_strings(&nv.value)?,
-                    META_POST_DISSECT => self.post_dissect = parse_strings(&nv.value)?,
-                    _ => return make_err(meta, "unrecognized attribute"),
-                },
-            },
-            _ => return make_err(meta, "unexpected meta item"),
-        };
-        Ok(())
+                };
+
+                match ident.to_string().as_str() {
+                    META_RENAME => {
+                        if let Some(lit) = get_lit_str(&nv.value) {
+                            self.rename = Some(lit.value());
+                        }
+                    }
+                    META_PRE_DISSECT => {
+                        self.pre_dissect = parse_strings(&nv.value);
+                    }
+                    META_POST_DISSECT => {
+                        self.post_dissect = parse_strings(&nv.value);
+                    }
+                    _ => emit_error!(ident, "unrecognized variant attribute";
+                        help = "valid attributes are: rename, pre_dissect, post_dissect"
+                    ),
+                }
+            }
+            _ => emit_error!(meta, "unexpected attribute format";
+                help = "variant attributes must be in name = value format"
+            ),
+        }
     }
 }
 
@@ -443,15 +552,23 @@ pub(crate) fn get_docs(attrs: &[syn::Attribute]) -> Option<String> {
 
 /// Extracts the doc comment contents from an attribute, if any.
 fn get_doc(attr: &syn::Attribute) -> Option<String> {
-    match attr.meta {
-        syn::Meta::NameValue(ref nv) => {
-            if nv.path.segments.len() == 1 && nv.path.segments.last().unwrap().ident == *"doc" {
-                get_lit_str(&nv.value)
-                    .ok()
-                    .map(|lit| lit.value().trim().to_string())
-            } else {
-                None
+    match &attr.meta {
+        syn::Meta::NameValue(nv) => {
+            // Check if this is a doc attribute
+            let is_doc = nv.path.segments.len() == 1
+                && nv
+                    .path
+                    .segments
+                    .first()
+                    .map(|seg| seg.ident == "doc")
+                    .unwrap_or(false);
+
+            if !is_doc {
+                return None;
             }
+
+            // Get the string value and trim it
+            get_lit_str(&nv.value).map(|lit| lit.value().trim().to_string())
         }
         _ => None,
     }

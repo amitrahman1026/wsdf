@@ -2,7 +2,7 @@
 
 use proc_macro::TokenStream;
 
-use proc_macro_error2::{abort, proc_macro_error};
+use proc_macro_error2::{abort, emit_error, proc_macro_error};
 use quote::{format_ident, quote, ToTokens};
 use syn::parse::{Parse, ParseStream};
 use syn::parse_quote;
@@ -163,18 +163,18 @@ pub fn derive_dissect(input: TokenStream) -> TokenStream {
 }
 
 fn derive_dissect_impl(input: &syn::DeriveInput) -> proc_macro2::TokenStream {
-    let dissect_options = match init_options::<ProtocolFieldOptions>(&input.attrs) {
-        Ok(opts) => opts,
-        Err(e) => abort!(input, "Invalid prootocol field options {}", e),
-    };
+    let dissect_options = init_options::<ProtocolFieldOptions>(&input.attrs);
     match &input.data {
-        syn::Data::Struct(data) => match StructInnards::from_fields(&data.fields) {
-            Ok(struct_info) => {
+        syn::Data::Struct(data) => StructInnards::from_fields(&data.fields)
+            .map(|struct_info| {
                 derive_dissect_impl_struct(&input.ident, &dissect_options, &struct_info)
                     .into_token_stream()
-            }
-            Err(e) => abort!(data.fields, "Failed to process struct fields: {}", e),
-        },
+            })
+            .unwrap_or_else(|e| {
+                emit_error!(data.fields, "Failed to process struct fields: {}", e);
+                proc_macro2::TokenStream::new()
+            }),
+
         syn::Data::Enum(data) => {
             // We'll cheat for enums. For each variant, we create a new struct, and then derive
             // Dissect on that struct.
@@ -373,14 +373,14 @@ pub fn derive_proto(input: TokenStream) -> TokenStream {
 
 fn derive_proto_impl(input: &syn::DeriveInput) -> syn::Result<syn::ItemImpl> {
     if !matches!(input.data, syn::Data::Struct { .. }) {
-        return make_err(&input, "only structs can derive Proto");
+        emit_error!(input, "only structs can derive Proto")
     }
 
     let ident = &input.ident;
 
-    let proto_opts = init_options::<ProtocolOptions>(&input.attrs)?;
+    let proto_opts = init_options::<ProtocolOptions>(&input.attrs);
     if proto_opts.decode_from.is_empty() {
-        return make_err(&input.ident, "missing `decode_from` attribute");
+        abort!(input.ident, "only structs can derive Proto")
     }
 
     let add_dissector = proto_opts.decode_from.iter().map(DecodeFrom::to_tokens);

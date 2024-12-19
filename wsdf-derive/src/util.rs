@@ -1,53 +1,65 @@
 use std::fmt::Display;
 
 use once_cell::sync::Lazy;
+use proc_macro_error2::emit_error;
 use quote::{format_ident, quote};
 use regex::{Captures, Regex};
-use syn::{parse_quote, spanned::Spanned};
+use syn::parse_quote;
 
-pub(crate) fn make_err<T>(tok: &impl Spanned, msg: &str) -> Result<T, syn::Error> {
-    Err(syn::Error::new(tok.span(), msg))
-}
-
-/// Extracts a literal value out of some `name = value` meta item.
-///
-/// # Example
-///
-/// ```ignore
-/// get_lit!(nv, Bool, "expected a boolean literal")?;
-/// ```
-macro_rules! get_lit {
-    ($($expr:ident).+, $lit_ty:ident, $err:literal $(,)?) => {
-        match $($expr).+ {
-            syn::Expr::Lit(syn::ExprLit {
-                lit: syn::Lit::$lit_ty(ref x),
-                ..
-            }) => Ok(x),
-            _ => Err(syn::Error::new($($expr).+.span(), $err)),
+pub(crate) fn get_lit_str(expr: &syn::Expr) -> Option<&syn::LitStr> {
+    match expr {
+        syn::Expr::Lit(syn::ExprLit {
+            lit: syn::Lit::Str(ref x),
+            ..
+        }) => Some(x),
+        _ => {
+            emit_error!(expr, "expected a string literal");
+            None
         }
-    };
-}
-
-pub(crate) fn get_lit_str(expr: &syn::Expr) -> syn::Result<&syn::LitStr> {
-    get_lit!(expr, Str, "expected a string literal")
-}
-
-pub(crate) fn get_lit_int(expr: &syn::Expr) -> syn::Result<&syn::LitInt> {
-    get_lit!(expr, Int, "expected an integer literal")
-}
-
-pub(crate) fn get_lit_bool(expr: &syn::Expr) -> syn::Result<&syn::LitBool> {
-    get_lit!(expr, Bool, "expected a boolean literal")
-}
-
-pub(crate) fn parse_strings<T: syn::parse::Parse>(expr: &syn::Expr) -> syn::Result<Vec<T>> {
-    let xs = unpack_expr(expr);
-    let mut ret = Vec::with_capacity(xs.len());
-    for x in xs {
-        let s = get_lit_str(x)?;
-        ret.push(syn::parse_str::<T>(&s.value())?);
     }
-    Ok(ret)
+}
+
+pub(crate) fn get_lit_int(expr: &syn::Expr) -> Option<&syn::LitInt> {
+    match expr {
+        syn::Expr::Lit(syn::ExprLit {
+            lit: syn::Lit::Int(ref x),
+            ..
+        }) => Some(x),
+        _ => {
+            emit_error!(expr, "expected an integer literal");
+            None
+        }
+    }
+}
+
+pub(crate) fn get_lit_bool(expr: &syn::Expr) -> Option<&syn::LitBool> {
+    match expr {
+        syn::Expr::Lit(syn::ExprLit {
+            lit: syn::Lit::Bool(ref x),
+            ..
+        }) => Some(x),
+        _ => {
+            emit_error!(expr, "expected an boolean literal");
+            None
+        }
+    }
+}
+
+pub(crate) fn parse_strings<T: syn::parse::Parse>(expr: &syn::Expr) -> Vec<T> {
+    let xs = unpack_expr(expr);
+    let ret: Vec<T> = xs
+        .iter()
+        .filter_map(|x| {
+            get_lit_str(x).and_then(|s| match syn::parse_str::<T>(&s.value()) {
+                Ok(val) => Some(val),
+                Err(e) => {
+                    emit_error!(x, "failed to parse string: {}", e);
+                    None
+                }
+            })
+        })
+        .collect();
+    ret
 }
 
 // Trick from https://stackoverflow.com/a/59619245
