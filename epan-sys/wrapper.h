@@ -7,6 +7,7 @@
 #include <epan/packet.h>
 #include <epan/proto.h>
 #include <epan/decode_as.h>
+#include <epan/expert.h>
 
 
 
