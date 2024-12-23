@@ -544,6 +544,7 @@ use std::ffi::{c_char, c_int, c_uint, c_void, CString};
 
 pub use epan_sys;
 pub use wsdf_derive::{protocol, version, Dissect, Proto};
+pub mod wireshark;
 
 /// Relevant to enum types only. Represents how the variant should be picked.
 #[doc(hidden)]
