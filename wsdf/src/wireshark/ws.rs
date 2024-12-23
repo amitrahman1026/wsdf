@@ -1,7 +1,7 @@
 #[allow(unused)]
-mod ws_wrappers {
+pub mod ffi {
 
-    use epan_sys;
+    use epan_sys::{self, tvbuff};
     use std::ffi::CString;
 
     pub struct PacketInfo {
@@ -32,6 +32,49 @@ mod ws_wrappers {
                     c_str.as_ptr(),
                 );
             }
+        }
+    }
+
+    pub struct TvBuffer {
+        ptr: *mut epan_sys::tvbuff,
+    }
+
+    impl TvBuffer {
+        pub fn new(ptr: *mut epan_sys::tvbuff) -> Self {
+            Self { ptr }
+        }
+    }
+
+    pub struct ProtoTree {
+        ptr: *mut epan_sys::_proto_node,
+    }
+
+    impl ProtoTree {
+        pub fn new(ptr: *mut epan_sys::_proto_node) -> Self {
+            Self { ptr }
+        }
+        fn add_item(&self /* hfindex : ?, tvb : TvBuffer, start, length, encoding */) {
+            unimplemented!()
+        }
+        fn add_uint_format_value(
+            &self, /* hfindex: ?, tvb : TvBuffer, start, length, value, format : &str, ...*/
+        ) {
+            unimplemented!()
+        }
+        fn add_int_format_value(
+            &self, /* hfindex: ?, tvb : TvBuffer, start, length, value, format : &str, ...*/
+        ) {
+            unimplemented!()
+        }
+        fn add_none_format(
+            &self, /* hfindex: ?, tvb : TvBuffer, start, length, value, format : &str, ...*/
+        ) {
+            unimplemented!()
+        }
+        fn add_bytes_format_value(
+            &self, /* hfindex: ?, tvb : TvBuffer, start, length, start_ptr */
+        ) {
+            unimplemented!()
         }
     }
 }
