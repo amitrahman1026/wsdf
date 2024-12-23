@@ -43,6 +43,41 @@ pub mod ffi {
         pub fn new(ptr: *mut epan_sys::tvbuff) -> Self {
             Self { ptr }
         }
+
+        pub fn get_uint8(&self, offset: usize) {
+            unimplemented!()
+        }
+
+        pub fn get_int8(&self, offset: usize) {
+            unimplemented!()
+        }
+        pub fn get_int16(&self, offset: usize) {
+            unimplemented!()
+        }
+        pub fn get_int32(&self, offset: usize) {
+            unimplemented!()
+        }
+        pub fn get_int64(&self, offset: usize) {
+            unimplemented!()
+        }
+
+        pub fn get_ntohs(&self, offset: usize) {
+            unimplemented!()
+        }
+        pub fn get_ntohl(&self, offset: usize) {
+            unimplemented!()
+        }
+        pub fn get_ntoh64(&self, offset: usize) {
+            unimplemented!()
+        }
+
+        pub fn new_subset_length(&self, backing_offset: usize, reported_length: usize) -> Self {
+            unimplemented!()
+        }
+
+        pub fn reported_length(&self) -> usize {
+            unimplemented!()
+        }
     }
 
     pub struct ProtoTree {
