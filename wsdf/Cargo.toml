@@ -43,3 +43,7 @@ crate-type = ["cdylib"]
 [[example]]
 name = "multi"
 crate-type = ["cdylib"]
+
+[[example]]
+name = "raw_ffi"
+crate-type = ["cdylib"]
