@@ -480,7 +480,7 @@ pub const G_GINTPTR_FORMAT: &[u8; 3] = b"li\0";
 pub const G_GUINTPTR_FORMAT: &[u8; 3] = b"lu\0";
 pub const GLIB_MAJOR_VERSION: u32 = 2;
 pub const GLIB_MINOR_VERSION: u32 = 82;
-pub const GLIB_MICRO_VERSION: u32 = 2;
+pub const GLIB_MICRO_VERSION: u32 = 3;
 pub const G_VA_COPY_AS_ARRAY: u32 = 1;
 pub const G_HAVE_ISO_VARARGS: u32 = 1;
 pub const G_HAVE_GROWING_STACK: u32 = 0;
@@ -893,7 +893,7 @@ pub const PTHREAD_ONCE_INIT: u32 = 0;
 pub const PTHREAD_BARRIER_SERIAL_THREAD: i32 = -1;
 pub const WIRESHARK_VERSION_MAJOR: u32 = 4;
 pub const WIRESHARK_VERSION_MINOR: u32 = 4;
-pub const WIRESHARK_VERSION_MICRO: u32 = 1;
+pub const WIRESHARK_VERSION_MICRO: u32 = 2;
 pub const _STDIO_H: u32 = 1;
 pub const _____fpos_t_defined: u32 = 1;
 pub const ____mbstate_t_defined: u32 = 1;
@@ -1736,6 +1736,13 @@ pub const MAX_DECODE_AS_PROMPT_LEN: u32 = 200;
 pub const DECODE_AS_ENTRY: &[u8; 16] = b"decode_as_entry\0";
 pub const DECODE_AS_NONE: &[u8; 7] = b"(none)\0";
 pub const DECODE_AS_ENTRIES_FILE_NAME: &[u8; 18] = b"decode_as_entries\0";
+pub const EI_INIT_EI: i32 = -1;
+pub const EI_INIT_HF: i32 = -1;
+pub const PRE_ALLOC_EXPERT_FIELDS_MEM: u32 = 5000;
+pub const EXPERT_CHECKSUM_DISABLED: i32 = -2;
+pub const EXPERT_CHECKSUM_UNKNOWN: i32 = -1;
+pub const EXPERT_CHECKSUM_GOOD: u32 = 0;
+pub const EXPERT_CHECKSUM_BAD: u32 = 1;
 pub type __u_char = ::std::os::raw::c_uchar;
 pub type __u_short = ::std::os::raw::c_ushort;
 pub type __u_int = ::std::os::raw::c_uint;
@@ -38017,6 +38024,9 @@ extern "C" {
     );
 }
 extern "C" {
+    pub fn fvalue_set_protocol_length(fv: *mut fvalue_t, length: ::std::os::raw::c_int);
+}
+extern "C" {
     pub fn fvalue_set_uinteger(fv: *mut fvalue_t, value: u32);
 }
 extern "C" {
@@ -38195,11 +38205,6 @@ pub type register_cb = ::std::option::Option<
 >;
 extern "C" {
     pub static mut hf_text_only: ::std::os::raw::c_int;
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct expert_field {
-    _unused: [u8; 0],
 }
 pub type custom_fmt_func_t =
     ::std::option::Option<unsafe extern "C" fn(arg1: *mut ::std::os::raw::c_char, arg2: u32)>;
@@ -44700,6 +44705,388 @@ extern "C" {
         value: *mut ::std::os::raw::c_void,
         user_data: *mut ::std::os::raw::c_void,
     );
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct expert_info_s {
+    pub packet_num: u32,
+    pub group: ::std::os::raw::c_int,
+    pub severity: ::std::os::raw::c_int,
+    pub hf_index: ::std::os::raw::c_int,
+    pub protocol: *const ::std::os::raw::c_char,
+    pub summary: *mut ::std::os::raw::c_char,
+    pub pitem: *mut proto_item,
+}
+#[test]
+fn bindgen_test_layout_expert_info_s() {
+    const UNINIT: ::std::mem::MaybeUninit<expert_info_s> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<expert_info_s>(),
+        40usize,
+        concat!("Size of: ", stringify!(expert_info_s))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<expert_info_s>(),
+        8usize,
+        concat!("Alignment of ", stringify!(expert_info_s))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).packet_num) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(expert_info_s),
+            "::",
+            stringify!(packet_num)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).group) as usize - ptr as usize },
+        4usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(expert_info_s),
+            "::",
+            stringify!(group)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).severity) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(expert_info_s),
+            "::",
+            stringify!(severity)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hf_index) as usize - ptr as usize },
+        12usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(expert_info_s),
+            "::",
+            stringify!(hf_index)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).protocol) as usize - ptr as usize },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(expert_info_s),
+            "::",
+            stringify!(protocol)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).summary) as usize - ptr as usize },
+        24usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(expert_info_s),
+            "::",
+            stringify!(summary)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).pitem) as usize - ptr as usize },
+        32usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(expert_info_s),
+            "::",
+            stringify!(pitem)
+        )
+    );
+}
+pub type expert_info_t = expert_info_s;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct expert_field {
+    pub ei: ::std::os::raw::c_int,
+    pub hf: ::std::os::raw::c_int,
+}
+#[test]
+fn bindgen_test_layout_expert_field() {
+    const UNINIT: ::std::mem::MaybeUninit<expert_field> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<expert_field>(),
+        8usize,
+        concat!("Size of: ", stringify!(expert_field))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<expert_field>(),
+        4usize,
+        concat!("Alignment of ", stringify!(expert_field))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).ei) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(expert_field),
+            "::",
+            stringify!(ei)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hf) as usize - ptr as usize },
+        4usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(expert_field),
+            "::",
+            stringify!(hf)
+        )
+    );
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct expert_field_info {
+    pub name: *const ::std::os::raw::c_char,
+    pub group: ::std::os::raw::c_int,
+    pub severity: ::std::os::raw::c_int,
+    pub summary: *const ::std::os::raw::c_char,
+    pub id: ::std::os::raw::c_int,
+    pub protocol: *const ::std::os::raw::c_char,
+    pub orig_severity: ::std::os::raw::c_int,
+    pub hf_info: hf_register_info,
+}
+#[test]
+fn bindgen_test_layout_expert_field_info() {
+    const UNINIT: ::std::mem::MaybeUninit<expert_field_info> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<expert_field_info>(),
+        128usize,
+        concat!("Size of: ", stringify!(expert_field_info))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<expert_field_info>(),
+        8usize,
+        concat!("Alignment of ", stringify!(expert_field_info))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).name) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(expert_field_info),
+            "::",
+            stringify!(name)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).group) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(expert_field_info),
+            "::",
+            stringify!(group)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).severity) as usize - ptr as usize },
+        12usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(expert_field_info),
+            "::",
+            stringify!(severity)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).summary) as usize - ptr as usize },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(expert_field_info),
+            "::",
+            stringify!(summary)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).id) as usize - ptr as usize },
+        24usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(expert_field_info),
+            "::",
+            stringify!(id)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).protocol) as usize - ptr as usize },
+        32usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(expert_field_info),
+            "::",
+            stringify!(protocol)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).orig_severity) as usize - ptr as usize },
+        40usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(expert_field_info),
+            "::",
+            stringify!(orig_severity)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hf_info) as usize - ptr as usize },
+        48usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(expert_field_info),
+            "::",
+            stringify!(hf_info)
+        )
+    );
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct ei_register_info {
+    pub ids: *mut expert_field,
+    pub eiinfo: expert_field_info,
+}
+#[test]
+fn bindgen_test_layout_ei_register_info() {
+    const UNINIT: ::std::mem::MaybeUninit<ei_register_info> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<ei_register_info>(),
+        136usize,
+        concat!("Size of: ", stringify!(ei_register_info))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<ei_register_info>(),
+        8usize,
+        concat!("Alignment of ", stringify!(ei_register_info))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).ids) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ei_register_info),
+            "::",
+            stringify!(ids)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).eiinfo) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ei_register_info),
+            "::",
+            stringify!(eiinfo)
+        )
+    );
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct expert_module {
+    _unused: [u8; 0],
+}
+pub type expert_module_t = expert_module;
+extern "C" {
+    pub static mut proto_expert: ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn expert_init();
+}
+extern "C" {
+    pub fn expert_packet_init();
+}
+extern "C" {
+    pub fn expert_cleanup();
+}
+extern "C" {
+    pub fn expert_packet_cleanup();
+}
+extern "C" {
+    pub fn expert_get_highest_severity() -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn expert_update_comment_count(count: u64);
+}
+extern "C" {
+    pub fn expert_add_info(
+        pinfo: *mut packet_info,
+        pi: *mut proto_item,
+        eiindex: *mut expert_field,
+    ) -> *mut proto_item;
+}
+extern "C" {
+    pub fn expert_add_info_format(
+        pinfo: *mut packet_info,
+        pi: *mut proto_item,
+        eiindex: *mut expert_field,
+        format: *const ::std::os::raw::c_char,
+        ...
+    ) -> *mut proto_item;
+}
+extern "C" {
+    pub fn proto_tree_add_expert(
+        tree: *mut proto_tree,
+        pinfo: *mut packet_info,
+        eiindex: *mut expert_field,
+        tvb: *mut tvbuff_t,
+        start: ::std::os::raw::c_int,
+        length: ::std::os::raw::c_int,
+    ) -> *mut proto_item;
+}
+extern "C" {
+    pub fn proto_tree_add_expert_format(
+        tree: *mut proto_tree,
+        pinfo: *mut packet_info,
+        eiindex: *mut expert_field,
+        tvb: *mut tvbuff_t,
+        start: ::std::os::raw::c_int,
+        length: ::std::os::raw::c_int,
+        format: *const ::std::os::raw::c_char,
+        ...
+    ) -> *mut proto_item;
+}
+extern "C" {
+    pub fn expert_register_protocol(id: ::std::os::raw::c_int) -> *mut expert_module_t;
+}
+extern "C" {
+    pub fn expert_deregister_expertinfo(abbrev: *const ::std::os::raw::c_char);
+}
+extern "C" {
+    pub fn expert_deregister_protocol(module: *mut expert_module_t);
+}
+extern "C" {
+    pub fn expert_free_deregistered_expertinfos();
+}
+extern "C" {
+    pub fn expert_get_summary(eiindex: *mut expert_field) -> *const ::std::os::raw::c_char;
+}
+extern "C" {
+    pub fn expert_register_field_array(
+        module: *mut expert_module_t,
+        ei: *mut ei_register_info,
+        num_records: ::std::os::raw::c_int,
+    );
+}
+extern "C" {
+    pub static expert_group_vals: [value_string; 0usize];
+}
+extern "C" {
+    pub static expert_severity_vals: [value_string; 0usize];
+}
+extern "C" {
+    pub static expert_checksum_vals: [value_string; 0usize];
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
