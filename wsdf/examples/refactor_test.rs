@@ -32,7 +32,7 @@ static mut ETT_WSDFPROTO: i32 = -1;
 // Some examples of heuristics included in wireshark
 // This is done as a define to indicate min number of bytes otherwise reject this package
 const WSDFPROTO_MIN_LENGTH: u32 = 8;
-const WSDFPROTO_MAX_LENGTH_LENGTH_NEEDED_FOR_HEURISTIC: u32 = 8; // Seems like an uncommon usage
+const WSDFPROTO_MAX_LENGTH_LENGTH_NEEDED_FOR_HEURISTIC: u32 = 8; // This feature seems like an uncommon usage
 const WSDFPROTO_BOOLEAN_HEURISTIC: bool = false;
 
 #[no_mangle]
@@ -67,17 +67,28 @@ unsafe extern "C" fn dissect_wsdfproto(
     // and the 'Info' column which will be arbitrary misc. information
     // Safest api to expose are col_set_tr, col_append_str
     epan_sys::col_clear((*pinfo).cinfo, epan_sys::COL_INFO as _); // Clear info column before filling it (looks like good practice from moldudp64)
-    let proto_abbvr_str = std::ffi::CString::new("WSDFPROTO").unwrap(); // this needs to be leaked? given?
+                                                                  // let proto_abbvr_str = std::ffi::CString::new("WSDFPROTO").unwrap(); // this needs to be leaked? given?
+    let proto_abbvr_str = Box::leak(
+        std::ffi::CString::new("WSDFPROTO")
+            .unwrap()
+            .into_boxed_c_str(),
+    );
     epan_sys::col_set_str(
         (*pinfo).cinfo,
-        epan_sys::COL_INFO as _,
+        epan_sys::COL_PROTOCOL as _,
         proto_abbvr_str.as_ptr(),
     );
 
+    epan_sys::col_clear((*pinfo).cinfo, epan_sys::COL_INFO as _);
     let info_col_str = Box::leak(
         std::ffi::CString::new("wsdf proto message")
             .unwrap()
             .into_boxed_c_str(),
+    );
+    epan_sys::col_set_str(
+        (*pinfo).cinfo,
+        epan_sys::COL_INFO as _,
+        info_col_str.as_ptr(),
     );
 
     /* Protocol Tree Construction */
@@ -125,14 +136,15 @@ unsafe extern "C" fn dissect_wsdfproto(
 #[no_mangle]
 pub unsafe extern "C" fn proto_register_wsdfproto() {
     // Register protocol fields
-    let hf = [epan_sys::hf_register_info {
+
+    static mut hf: [epan_sys::hf_register_info; 1] = [epan_sys::hf_register_info {
         /* ---------- set by dissector --------- */
-        p_id: &mut HF_FIELD_WSDFPROTO,
+        p_id: unsafe { &mut HF_FIELD_WSDFPROTO },
         hfinfo: epan_sys::header_field_info {
             name: b"WSDF Field\0".as_ptr() as *const i8,
             abbrev: b"wsdfproto.field\0".as_ptr() as *const i8,
-            type_: epan_sys::ftenum_FT_NONE,
-            display: epan_sys::field_display_e_BASE_NONE as i32,
+            type_: epan_sys::ftenum_FT_UINT32,
+            display: epan_sys::field_display_e_BASE_DEC as i32,
             strings: std::ptr::null(),
             bitmask: 0,
             blurb: b"Example WSDF Protocol Field\0".as_ptr() as *const i8,
@@ -148,7 +160,7 @@ pub unsafe extern "C" fn proto_register_wsdfproto() {
     }];
 
     // Register subtrees
-    let ett = [&mut ETT_WSDFPROTO];
+    static mut ett: [*mut i32; 1] = [unsafe { &mut ETT_WSDFPROTO as *mut i32 }];
 
     // Register expert info
     let ei = [epan_sys::ei_register_info {
@@ -239,7 +251,11 @@ pub unsafe extern "C" fn proto_reg_handoff_wsdfproto() {
     //     b"tcp.port\0".as_ptr() as *const i8,
     //     WSDFPROTO_HANDLE,
     // );
-    epan_sys::dissector_add_uint(b"ip.port\0".as_ptr() as *const i8, 17, WSDFPROTO_HANDLE);
+    epan_sys::dissector_add_uint(
+        b"ip.proto\0".as_ptr() as *const i8, // Register for IP protocol
+        17,                                  // UDP protocol number
+        WSDFPROTO_HANDLE,
+    );
 }
 // Final step: Protocol dissector -> pluginisation needs
 #[no_mangle]
@@ -249,7 +265,7 @@ pub extern "C" fn plugin_describe() -> u32 {
 #[no_mangle]
 pub extern "C" fn plugin_register() {
     static mut PLUG_0: wsdf::epan_sys::proto_plugin = wsdf::epan_sys::proto_plugin {
-        register_protoinfo: Some(proto_reg_handoff_wsdfproto),
+        register_protoinfo: Some(proto_register_wsdfproto),
         register_handoff: Some(proto_reg_handoff_wsdfproto),
     };
     unsafe {
