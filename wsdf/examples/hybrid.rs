@@ -1,217 +1,100 @@
 use epan_sys;
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::ffi::{c_int, CString};
-struct ProtocolData {
-    // Mutable index tables
-    // TODO: Find a way to keep these static .. should these internally use unsafe cells?
-    proto_id: c_int,
-    name: CString,
-    abbrev: CString,
-    filter: CString,
+use std::ffi::{c_int, c_void, CString};
+use thiserror::Error;
 
-    dissector_handle: Option<DissectorHandle>,
-}
-struct Protocol {
+pub struct Protocol {
     // Static data for this protocol
-    protocol_data: RefCell<ProtocolData>,
+    proto_handle: c_int,
+    // Holds the collapse state of the subtree
+    ett_handles: Vec<c_int>,
+    // Pointers to ett_handles vector above, registered to the protocol
+    ett_handles_ptrs: Vec<*mut c_int>,
+    id: *const c_int,
     // The actual dissector implementation
-    dissector: Box<dyn ProtoImpl>,
+    pub(crate) dissector_fn: Dissector,
+    field_defs: Vec<Field>,
+    // All registered fields for this protocol
+    field_handles: Vec<FieldHandle>,
+    // Pending match conditions for this protocol that have not yet been registered
+    match_definitions: Option<Vec<DissectorDecodeFrom>>,
 }
 
 impl Protocol {
-    pub fn new(name: &str, abbrev: &str, filter: &str, dissector: Box<dyn ProtoImpl>) -> Self {
-        let data = ProtocolData {
-            proto_id: -1,
-            name: CString::new(name).unwrap(),
-            abbrev: CString::new(abbrev).unwrap(),
-            filter: CString::new(filter).unwrap(),
-            dissector_handle: None,
+    unsafe fn register_field(&mut self, field: &Field) -> Result<(), RegistrationError> {
+        let mut handle: c_int = -1;
+
+        // Convert strings for value_string if present
+        let values_ptr = if let Some(strings) = &field.strings {
+            let values: Vec<epan_sys::_value_string> = strings
+                .iter()
+                .map(|(val, str)| epan_sys::_value_string {
+                    value: *val,
+                    strptr: to_c_str(str),
+                })
+                .collect();
+
+            Box::into_raw(values.into_boxed_slice()) as *const epan_sys::_value_string
+        } else {
+            std::ptr::null()
         };
 
-        Self {
-            protocol_data: RefCell::new(data),
-            dissector,
-        }
-    }
-
-    fn register(&mut self) {
-        let mut data = self.protocol_data.borrow_mut();
-
-        unsafe {
-            data.proto_id = epan_sys::proto_register_protocol(
-                data.name.as_ptr(),
-                data.abbrev.as_ptr(),
-                data.filter.as_ptr(),
-            );
-        }
-    }
-}
-// This trait represents the user's implementation
-trait ProtoImpl {
-    fn dissect(&self, tvb: &Tvb, pinfo: &PacketInfo, tree: &mut Tree) -> i32;
-}
-
-// The Proto trait should implemented by Protocol / proc macros -> the selling point of wsdf, users can create a dylib plugin transparently
-// Power users can use this at their own risk
-trait Proto {
-    unsafe extern "C" fn dissect_main(
-        &self,
-        tvb: *mut epan_sys::tvbuff,
-        pinfo: *mut epan_sys::_packet_info,
-        tree: *mut epan_sys::_proto_node,
-        data: *mut std::ffi::c_void,
-    ) -> std::ffi::c_int;
-
-    unsafe extern "C" fn register_protoinfo(&self);
-    unsafe extern "C" fn register_handoff(&self);
-}
-
-impl Proto for Protocol {
-    unsafe extern "C" fn dissect_main(
-        &self,
-        tvb: *mut epan_sys::tvbuff,
-        pinfo: *mut epan_sys::_packet_info,
-        tree: *mut epan_sys::_proto_node,
-        _data: *mut std::ffi::c_void,
-    ) -> std::ffi::c_int {
-        // Safe wrapper that calls the user's ProtoImpl::dissect
-        let tvb = Tvb::new(tvb);
-        let pinfo = PacketInfo::new(pinfo);
-        let mut tree = Tree::new(tree);
-
-        self.dissector.dissect(&tvb, &pinfo, &mut tree)
-    }
-
-    unsafe extern "C" fn register_protoinfo(&self) {
-        // Registration using Protocol's fields
-    }
-
-    unsafe extern "C" fn register_handoff(&self) {
-        // Handoff using Protocol's fields
-    }
-}
-
-// Potential macros
-use proc_macro::TokenStream;
-use quote::{format_ident, quote, ToTokens};
-use syn::Token;
-
-// For plugin registration, the idea should be to do something like plugin!(...).
-
-// TODO: return to this once api is stable
-#[proc_macro_derive(Proto)]
-pub fn derive_proto(_input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    // Instead of implementing Proto directly, we generate:
-    let proto_derive_impl = quote! {
-        // impl ProtoImpl for #ident {
-        //     unimplemented!()
-        // }
-        // impl From<#ident> for Protocol {
-        //     unimplemented!()
-        // }
-    };
-    proto_derive_impl.to_token_stream().into()
-}
-
-// The current protocol!(...) is actually close to what we need and exposes things correctly,
-// renaming and modifying to use the above abstraction should work
-
-// Internal input parser for plugin! macro that takes a list of user defined protocol types
-struct PluginProtocols {
-    protocols: Vec<syn::Type>,
-}
-
-impl syn::parse::Parse for PluginProtocols {
-    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let protocols = input
-            .parse_terminated(syn::Type::parse, Token![,])?
-            .into_iter()
-            .collect();
-        Ok(PluginProtocols { protocols })
-    }
-}
-
-#[proc_macro]
-pub fn plugin(input: TokenStream) -> TokenStream {
-    let input = syn::parse_macro_input!(input as PluginProtocols);
-
-    let register_protos = input.protocols.iter().enumerate().map(|(i, proto_ty)| {
-        let handler_ident = format_ident!("PROTO_{}", i);
-
-        let ret = quote! {
-            static mut #handler_ident: wsdf::epan_sys::proto_plugin = wsdf::epan_sys::proto_plugin {
-                register_protoinfo: None,
-                register_handoff: None,
-            };
-            unsafe {
-                #handler_ident.register_protoinfo =
-                    std::option::Option::Some(<#proto_ty as wsdf::Proto>::register_protoinfo);
-                #handler_ident.register_handoff =
-                    std::option::Option::Some(<#proto_ty as wsdf::Proto>::register_handoff);
-                wsdf::epan_sys::proto_register_plugin(&#handler_ident);
-            }
+        let hf_info = epan_sys::hf_register_info {
+            p_id: &mut handle,
+            hfinfo: epan_sys::header_field_info {
+                name: to_c_str(&field.name),
+                abbrev: to_c_str(&field.abbrev),
+                type_: field.field_type.to_u32(),
+                display: field.display.to_u32() as i32,
+                strings: values_ptr as *const c_void,
+                bitmask: field.bitmask,
+                blurb: field
+                    .blurb
+                    .as_ref()
+                    .map_or(std::ptr::null(), |s| to_c_str(s)),
+                id: -1,
+                parent: 0,
+                ref_type: epan_sys::hf_ref_type_HF_REF_TYPE_NONE,
+                same_name_prev_id: -1,
+                same_name_next: std::ptr::null_mut(),
+            },
         };
-        ret
-    });
 
-    quote! {
-        // Wireshark will call this function to load our plugin.
-        #[no_mangle]
-        extern "C" fn plugin_register() {
-            #(#register_protos)*
+        let hf_ptr = Box::into_raw(Box::new(hf_info));
+        epan_sys::proto_register_field_array(self.proto_handle, hf_ptr, 1);
+
+        if handle != -1 {
+            self.field_handles.push(FieldHandle {
+                handle,
+                id: field.id.clone(),
+                _ptr: hf_ptr,
+            });
+            self.field_defs.push(field.clone());
+
+            Ok(())
+        } else {
+            Err(RegistrationError::RegistrationFailed)
         }
-        // Plugin required symbols for version check
-        #[no_mangle]
-        #[used]
-        #[allow(non_upper_case_globals)]
-        static plugin_version: [std::ffi::c_char; 6usize] = [48i8, 46i8, 48i8, 46i8, 49i8, 0i8];
-        #[no_mangle]
-        #[used]
-        #[allow(non_upper_case_globals)]
-        static plugin_want_major: std::ffi::c_uint = epan_sys::WIRESHARK_VERSION_MAJOR;
-        #[no_mangle]
-        #[used]
-        #[allow(non_upper_case_globals)]
-        static plugin_want_minor: std::ffi::c_uint = epan_sys::WIRESHARK_VERSION_MINOR;
     }
-    .into()
-}
+    fn get_ett_handle(&self, idx: c_int) -> c_int {
+        if idx < 0 {
+            panic!("ETT handle index must be >= 0");
+        }
 
-// WIP: Data structures needed to support the object oriented API
-struct Tvb {
-    ptr: *mut epan_sys::tvbuff,
-}
-impl Tvb {
-    pub fn new(ptr: *mut epan_sys::tvbuff) -> Self {
-        Self { ptr }
+        self.ett_handles.get(idx as usize).expect("ETT handle index out of bounds, use set_num_ett during protocol creation to set the number of ETT fields").clone()
     }
-}
-struct PacketInfo {
-    ptr: *mut epan_sys::_packet_info,
-}
-impl PacketInfo {
-    pub fn new(ptr: *mut epan_sys::_packet_info) -> Self {
-        Self { ptr }
+    // Get the handle to the protocol's ETT
+    fn get_proto_handle(&self) -> c_int {
+        self.proto_handle
+    }
+    // Get the handle to a field that has already been registered
+    fn get_field_handle(&self, abbrev: &str) -> Option<&FieldHandle> {
+        self.field_handles.iter().find(|field| field.id == abbrev)
     }
 }
 
-struct Tree {
-    ptr: *mut epan_sys::proto_node,
-}
-impl Tree {
-    pub fn new(self, ptr: *mut epan_sys::proto_node) -> Self {
-        Self { ptr }
-    }
-}
-#[derive(Default)]
-struct DissectorTables {
-    tables: HashMap<String, epan_sys::dissector_table_t>,
-}
-struct DissectorHandle(epan_sys::dissector_handle);
-
-struct HeaderFieldInfo {
-    // Args required for header field registration
+#[derive(Clone)]
+pub struct Field {
+    id: String,
     name: String,
     abbrev: String,
     field_type: FieldType,
@@ -221,59 +104,277 @@ struct HeaderFieldInfo {
     blurb: Option<String>,
 }
 
-impl HeaderFieldInfo {
-    pub fn new(name: &str, abbrev: &str, field_type: FieldType, display: FieldDisplay) -> Self {
+// #[derive(Default)]
+pub struct FieldBuilder {
+    id: String,
+    name: String,
+    abbrev: String,
+    field_type: Option<FieldType>,
+    display: Option<FieldDisplay>,
+    strings: Option<Vec<(u32, String)>>,
+    bitmask: u64,
+    blurb: Option<String>,
+}
+impl FieldBuilder {
+    pub fn new(id: impl Into<String>, name: impl Into<String>, abbrev: impl Into<String>) -> Self {
         Self {
-            name: name.to_string(),
-            abbrev: abbrev.to_string(),
-            field_type,
-            display,
+            id: id.into(),
+            name: name.into(),
+            abbrev: abbrev.into(),
+            field_type: None,
+            display: None,
             strings: None,
             bitmask: 0,
             blurb: None,
         }
     }
 
-    fn into_hf_register_info(&self, field_id_ptr: *mut i32) -> epan_sys::hf_register_info {
-        // Convert the field definition into Wireshark's hf_register_info below
+    pub fn field_type(mut self, field_type: FieldType) -> Self {
+        self.field_type = Some(field_type);
+        self
+    }
 
-        // typedef struct hf_register_info {
-        //     int               *p_id;   /**< written to by register() function */
-        //     header_field_info  hfinfo; /**< the field info to be registered */
-        // } hf_register_info;
+    pub fn display(mut self, display: FieldDisplay) -> Self {
+        self.display = Some(display);
+        self
+    }
 
-        // This would construct the actual C struct hf_register_info to be added to hf array
-        // Cloning for now because these are just done once
-        let name = CString::new(self.name.clone()).unwrap();
-        let abbrev = CString::new(self.abbrev.clone()).unwrap();
-        let blurb = self
-            .blurb
-            .as_ref()
-            .map(|b| CString::new(b.clone()).unwrap());
+    pub fn strings(mut self, strings: Vec<(u32, String)>) -> Self {
+        self.strings = Some(strings);
+        self
+    }
 
-        epan_sys::hf_register_info {
-            p_id: field_id_ptr,
-            hfinfo: epan_sys::header_field_info {
-                name: name.into_raw(),
-                abbrev: abbrev.into_raw(),
-                type_: self.field_type.to_wireshark_enum() as u32,
-                display: self.display.to_wireshark_enum() as i32,
-                strings: std::ptr::null(), // TODO: make a conversion for this
-                bitmask: self.bitmask,
-                blurb: blurb.map_or(std::ptr::null(), |b| b.into_raw()),
-                id: -1,
-                parent: 0,
-                ref_type: epan_sys::hf_ref_type_HF_REF_TYPE_NONE,
-                same_name_prev_id: -1,
-                same_name_next: std::ptr::null_mut(),
-            },
+    pub fn bitmask(mut self, bitmask: u64) -> Self {
+        self.bitmask = bitmask;
+        self
+    }
+
+    pub fn blurb(mut self, blurb: impl Into<String>) -> Self {
+        self.blurb = Some(blurb.into());
+        self
+    }
+
+    pub fn build(self) -> Result<Field, RegistrationError> {
+        Ok(Field {
+            id: self.id,
+            name: self.name,
+            abbrev: self.abbrev,
+            field_type: self.field_type.ok_or(RegistrationError::MissingFieldType)?,
+            display: self.display.unwrap_or_default(),
+            strings: self.strings,
+            bitmask: self.bitmask,
+            blurb: self.blurb,
+        })
+    }
+}
+
+pub struct FieldHandle {
+    handle: c_int,
+    id: String,
+    _ptr: *mut epan_sys::hf_register_info,
+}
+
+pub struct ProtocolBuilder {
+    name: String,
+    id: String,
+    filter: String,
+    dissector_fn: Option<Dissector>,
+    fields: Vec<Field>,
+    match_definitions: Vec<DissectorDecodeFrom>,
+}
+
+impl ProtocolBuilder {
+    pub fn new(name: impl Into<String>, id: impl Into<String>, filter: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            id: id.into(),
+            filter: filter.into(),
+            dissector_fn: None,
+            fields: Vec::new(),
+            match_definitions: Vec::new(),
+        }
+    }
+
+    pub fn dissector(mut self, dissector: Dissector) -> Self {
+        self.dissector_fn = Some(dissector);
+        self
+    }
+
+    pub fn field(mut self, field: Field) -> Self {
+        self.fields.push(field);
+        self
+    }
+
+    pub fn decode_from(mut self, decode_from: DissectorDecodeFrom) -> Self {
+        self.match_definitions.push(decode_from);
+        self
+    }
+    pub fn build(self) -> Result<Protocol, RegistrationError> {
+        let dissector = self
+            .dissector_fn
+            .ok_or(RegistrationError::MissingDissector)?;
+
+        unsafe {
+            let proto_handle = epan_sys::proto_register_protocol(
+                to_c_str(&self.name),
+                to_c_str(&self.id),
+                to_c_str(&self.filter),
+            );
+
+            Ok(Protocol {
+                proto_handle,
+                ett_handles: vec![-1; 1],
+                ett_handles_ptrs: Vec::new(),
+                id: std::ptr::null(),
+                dissector_fn: dissector,
+                field_defs: self.fields,   // Store the field definitions
+                field_handles: Vec::new(), // Will be populated during registration
+                match_definitions: Some(self.match_definitions),
+            })
         }
     }
 }
 
+// WIP: Data structures needed to support the object oriented API
+pub struct Tvb {
+    ptr: *mut epan_sys::tvbuff,
+}
+impl Tvb {
+    pub fn new(ptr: *mut epan_sys::tvbuff) -> Self {
+        Self { ptr }
+    }
+}
+pub struct PacketInfo {
+    ptr: *mut epan_sys::_packet_info,
+}
+impl PacketInfo {
+    pub fn new(ptr: *mut epan_sys::_packet_info) -> Self {
+        Self { ptr }
+    }
+    pub fn set_column_text(&self, col: Column, text: &str) -> Result<(), RegistrationError> {
+        let text = CString::new(text)?;
+        unsafe {
+            epan_sys::col_add_str((*self.ptr).cinfo, col as i32, text.as_ptr());
+        }
+        Ok(())
+    }
+
+    pub fn clear_column(&self, col: Column) {
+        unsafe {
+            epan_sys::col_clear((*self.ptr).cinfo, col as i32);
+        }
+    }
+}
+
+pub struct Tree<'a> {
+    tree: *mut epan_sys::proto_tree,
+    tvb: *mut epan_sys::tvbuff,
+    parent: *mut epan_sys::proto_node,
+    proto: &'a Protocol,
+    offset: i32,
+}
+
+impl<'a> Tree<'a> {
+    unsafe fn new(
+        proto: &'a Protocol,
+        tree: *mut epan_sys::proto_tree,
+        tvb: *mut epan_sys::tvbuff,
+        parent: *mut epan_sys::proto_node,
+        offset: i32,
+    ) -> Self {
+        Self {
+            tree,
+            tvb,
+            parent,
+            proto,
+            offset,
+        }
+    }
+    pub fn add_item(&mut self, field: &Field, length: i32) -> Option<TreeItem> {
+        unsafe {
+            let item = epan_sys::proto_tree_add_item(
+                self.tree,
+                self.proto.get_field_handle(&field.id)?.handle,
+                self.tvb,
+                self.offset,
+                length,
+                epan_sys::ENC_NA,
+            );
+
+            self.offset += length;
+
+            if !item.is_null() {
+                Some(TreeItem { item })
+            } else {
+                None
+            }
+        }
+    }
+    pub fn add_subtree(&mut self, field: &Field, length: i32) -> Option<Tree<'a>> {
+        let item = self.add_item(field, length)?;
+        unsafe {
+            let subtree = epan_sys::proto_item_add_subtree(item.item, self.proto.get_ett_handle(0));
+
+            Some(Tree::new(
+                self.proto,
+                subtree,
+                self.tvb,
+                self.parent,
+                self.offset,
+            ))
+        }
+    }
+}
+
+pub struct TreeItem {
+    item: *mut epan_sys::proto_item,
+}
+
+impl TreeItem {
+    pub fn set_text(&mut self, text: &str) -> Result<(), RegistrationError> {
+        let text = CString::new(text)?;
+        unsafe {
+            epan_sys::proto_item_set_text(self.item, text.as_ptr());
+        }
+        Ok(())
+    }
+
+    pub fn append_text(&mut self, text: &str) -> Result<(), RegistrationError> {
+        let text = CString::new(text)?;
+        unsafe {
+            epan_sys::proto_item_append_text(self.item, text.as_ptr());
+        }
+        Ok(())
+    }
+}
+
+/// The dissector table where subdissectors you want to call are registered.
+/// For more information https://gitlab.com/wireshark/wireshark/blob/ccd96c6f65ac507b8f2785385f31b874b3459f6b/doc/README.dissector#L2339
+pub enum DissectorDecodeFrom {
+    DecodeAs(String),
+    Uint(String, Vec<u32>),
+}
+
+pub type DissectorFn = Box<dyn Fn(&mut Tvb, &PacketInfo, &mut Tree) -> i32>;
+pub struct Dissector(DissectorFn);
+impl Dissector {
+    pub fn new<F>(f: F) -> Self
+    where
+        F: Fn(&mut Tvb, &PacketInfo, &mut Tree) -> i32 + 'static,
+    {
+        Dissector(Box::new(f))
+    }
+
+    pub fn call(&self, tvb: &mut Tvb, pinfo: &PacketInfo, tree: &mut Tree) -> i32 {
+        (self.0)(tvb, pinfo, tree)
+    }
+}
+
+// Enum wrappers
+
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone)]
-enum FieldType {
+pub enum FieldType {
     None,
     Protocol,
     Boolean,
@@ -323,7 +424,7 @@ enum FieldType {
     Scalar,
 }
 impl FieldType {
-    pub fn to_wireshark_enum(self) -> epan_sys::ftenum {
+    pub fn to_u32(self) -> epan_sys::ftenum {
         match self {
             FieldType::None => epan_sys::ftenum_FT_NONE,
             FieldType::Protocol => epan_sys::ftenum_FT_PROTOCOL,
@@ -376,8 +477,9 @@ impl FieldType {
     }
 }
 
-#[derive(Copy, Clone)]
-enum FieldDisplay {
+#[derive(Copy, Clone, Default)]
+pub enum FieldDisplay {
+    #[default]
     None,
     BaseDec,
     BaseHex,
@@ -405,7 +507,7 @@ enum FieldDisplay {
 }
 
 impl FieldDisplay {
-    pub fn to_wireshark_enum(self) -> epan_sys::field_display_e {
+    pub fn to_u32(self) -> epan_sys::field_display_e {
         match self {
             FieldDisplay::None => epan_sys::field_display_e_BASE_NONE,
             FieldDisplay::BaseDec => epan_sys::field_display_e_BASE_DEC,
@@ -434,3 +536,174 @@ impl FieldDisplay {
         }
     }
 }
+
+#[repr(i32)]
+pub enum Column {
+    Protocol = epan_sys::COL_PROTOCOL as i32,
+    Info = epan_sys::COL_INFO as i32,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum RegistrationError {
+    #[error("Protocol registration failed")]
+    RegistrationFailed,
+    #[error("Missing required dissector")]
+    MissingDissector,
+    #[error("Missing required field type")]
+    MissingFieldType,
+    #[error("CString conversion error: {0}")]
+    CStringError(#[from] std::ffi::NulError),
+}
+
+fn to_c_str(s: &str) -> *const i8 {
+    CString::new(s)
+        .expect("String contains null byte")
+        .into_raw() as *const i8
+}
+
+static mut PLUGIN: Option<Plugin> = None;
+
+pub struct Plugin {
+    protocols: Vec<Protocol>,
+}
+
+impl Plugin {
+    pub fn new() -> Self {
+        Self {
+            protocols: Vec::new(),
+        }
+    }
+    pub fn add_protocol(&mut self, protocol: Protocol) {
+        self.protocols.push(protocol);
+    }
+    pub unsafe fn get() -> &'static mut Self {
+        PLUGIN.as_mut().expect("Plugin not initialized")
+    }
+}
+
+unsafe extern "C" fn proto_register_protos() {
+    let plugin = Plugin::get();
+    let protocol = register_example_protocol().unwrap();
+    plugin.add_protocol(protocol);
+    // Register each protocol
+    for protocol in &mut plugin.protocols {
+        // Register fields from field_defs
+        let fields_to_register = protocol.field_defs.clone();
+
+        for field in fields_to_register {
+            protocol
+                .register_field(&field)
+                .expect("Failed to register field");
+        }
+
+        // Register ETT
+        let ett_ptrs: Vec<_> = protocol
+            .ett_handles
+            .iter_mut()
+            .map(|h| h as *mut _)
+            .collect();
+        epan_sys::proto_register_subtree_array(ett_ptrs.as_ptr(), ett_ptrs.len() as i32);
+    }
+}
+
+unsafe extern "C" fn proto_reg_handoff() {
+    // Handoff implementation for subdissector tables
+    let plugin = Plugin::get();
+
+    for protocol in &plugin.protocols {
+        // Create dissector handle
+        let handle =
+            epan_sys::create_dissector_handle(Some(dissector_handler), protocol.proto_handle);
+
+        // Register for each decode-from definition
+        if let Some(defs) = &protocol.match_definitions {
+            for def in defs {
+                match def {
+                    DissectorDecodeFrom::DecodeAs(table) => {
+                        let table = CString::new(table.as_str()).unwrap();
+                        epan_sys::dissector_add_for_decode_as(table.as_ptr(), handle);
+                    }
+                    DissectorDecodeFrom::Uint(table, values) => {
+                        let table = CString::new(table.as_str()).unwrap();
+                        for &value in values {
+                            epan_sys::dissector_add_uint(table.as_ptr(), value, handle);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+unsafe extern "C" fn dissector_handler(
+    tvb: *mut epan_sys::tvbuff,
+    pinfo: *mut epan_sys::_packet_info,
+    tree: *mut epan_sys::proto_tree,
+    data: *mut c_void,
+) -> c_int {
+    let mut tvb_wrapper = Tvb::new(tvb);
+    let pinfo_wrapper = PacketInfo::new(pinfo);
+    let protocol = (data as *mut Protocol).as_ref().unwrap();
+
+    let mut tree_wrapper = Tree::new(protocol, tree, tvb, std::ptr::null_mut(), 0);
+
+    protocol
+        .dissector_fn
+        .call(&mut tvb_wrapper, &pinfo_wrapper, &mut tree_wrapper)
+}
+
+#[no_mangle]
+pub extern "C" fn plugin_describe() -> u32 {
+    epan_sys::WS_PLUGIN_DESC_EPAN
+}
+
+#[no_mangle]
+pub extern "C" fn plugin_register() {
+    unsafe {
+        // Initialize global plugin if not already done
+        if PLUGIN.is_none() {
+            PLUGIN = Some(Plugin::new());
+        }
+    }
+
+    static PLUG: epan_sys::proto_plugin = epan_sys::proto_plugin {
+        register_protoinfo: Some(proto_register_protos),
+        register_handoff: Some(proto_reg_handoff),
+    };
+
+    unsafe {
+        epan_sys::proto_register_plugin(&PLUG);
+    }
+}
+
+pub fn register_example_protocol() -> Result<Protocol, RegistrationError> {
+    let protocol = ProtocolBuilder::new("Example Protocol", "example", "example")
+        .dissector(Dissector::new(|tvb, pinfo, tree| {
+            // Implementation of example dissector
+            // Add fields to tree, etc
+            0
+        }))
+        .field(
+            FieldBuilder::new("version", "Version", "example.version")
+                .field_type(FieldType::Uint8)
+                .display(FieldDisplay::BaseDec)
+                .build()?,
+        )
+        .decode_from(DissectorDecodeFrom::Uint("ip.proto".into(), vec![17]))
+        .build()?;
+
+    Ok(protocol)
+}
+
+#[no_mangle]
+#[used]
+#[allow(non_upper_case_globals)]
+static plugin_version: [std::ffi::c_char; 6usize] = [48i8, 46i8, 48i8, 46i8, 49i8, 0i8];
+#[no_mangle]
+#[used]
+#[allow(non_upper_case_globals)]
+static plugin_want_major: std::ffi::c_uint = epan_sys::WIRESHARK_VERSION_MAJOR;
+#[no_mangle]
+#[used]
+#[allow(non_upper_case_globals)]
+static plugin_want_minor: std::ffi::c_uint = epan_sys::WIRESHARK_VERSION_MINOR;
