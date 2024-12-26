@@ -1,15 +1,10 @@
 use epan_sys;
 use std::cell::RefCell;
-use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::ffi::{c_int, CString};
 struct ProtocolData {
     // Mutable index tables
     // TODO: Find a way to keep these static .. should these internally use unsafe cells?
-    hf_indices: HfIndices,
-    ett_indices: EttIndices,
-    dtables: DissectorTables,
-    // Protocol registration info
     proto_id: c_int,
     name: CString,
     abbrev: CString,
@@ -27,9 +22,6 @@ struct Protocol {
 impl Protocol {
     pub fn new(name: &str, abbrev: &str, filter: &str, dissector: Box<dyn ProtoImpl>) -> Self {
         let data = ProtocolData {
-            hf_indices: HfIndices::default(),
-            ett_indices: EttIndices::default(),
-            dtables: DissectorTables::default(),
             proto_id: -1,
             name: CString::new(name).unwrap(),
             abbrev: CString::new(abbrev).unwrap(),
@@ -53,10 +45,6 @@ impl Protocol {
                 data.filter.as_ptr(),
             );
         }
-
-        data.hf_indices.register_all(data.proto_id);
-        data.ett_indices.register_all(data.proto_id);
-
     }
 }
 // This trait represents the user's implementation
@@ -207,103 +195,15 @@ impl PacketInfo {
         Self { ptr }
     }
 }
+
 struct Tree {
-    ptr: *mut epan_sys::_proto_node,
+    ptr: *mut epan_sys::proto_node,
 }
 impl Tree {
-    pub fn new(ptr: *mut epan_sys::_proto_node) -> Self {
+    pub fn new(self, ptr: *mut epan_sys::proto_node) -> Self {
         Self { ptr }
     }
 }
-
-#[derive(Default)]
-struct HfIndices {
-    // Maps field name -> index in the storage
-    hf_storage_idx_lookup: HashMap<String, usize>,
-    // Individially Box the actual field IDs that Wireshark will write to
-    field_ids: Vec<Box<UnsafeCell<c_int>>>,
-    // TODO: Check if this should does the same thing as local static table
-    hf_storage: Box<UnsafeCell<Vec<epan_sys::hf_register_info>>>,
-}
-impl HfIndices {
-    pub fn new() -> Self {
-        Self {
-            hf_storage_idx_lookup: HashMap::new(),
-            field_ids: Vec::new(),
-            hf_storage: Box::new(UnsafeCell::new(Vec::new())),
-        }
-    }
-
-    pub fn add_field(&mut self, field: HeaderFieldInfo) {
-        let field_name = field.name.clone();
-        let field_id_idx = self.field_ids.len(); // The index at which this field is going to in hf_storage
-
-        // Box field ID becase hf_register_info.p_id is a static int *
-        let field_id = Box::new(UnsafeCell::new(-1));
-        let field_id_ptr = field_id.get();
-        self.field_ids.push(field_id);
-
-        // Create and store registration info
-        let hf_info = field.into_hf_register_info(field_id_ptr);
-
-        unsafe {
-            (*self.hf_storage.get()).push(hf_info);
-        }
-        self.hf_storage_idx_lookup.insert(field_name, field_id_idx);
-    }
-    pub fn register_all(&self, proto_id: c_int) {
-        unsafe {
-            let hf_storage = &mut *self.hf_storage.get();
-            epan_sys::proto_register_field_array(
-                proto_id.clone(),
-                hf_storage.as_mut_ptr(),
-                hf_storage.len() as i32,
-            );
-        }
-        // At this point Wireshark has set all the field IDs through the p_id pointers after registration
-    }
-
-    pub fn get_hf_id(&self, hf_name: &str) -> i32 {
-        // This will require a bit of indirection. First we look up where the hf_info is in the storage
-        let idx = self.hf_storage_idx_lookup.get(hf_name).unwrap();
-        // Then we lookup the hf_register_info.p_id that has been written to by the register() fn
-        // This should be written to by wireshark's register routine
-        // This functions should not be called before said register routine is called
-        unsafe {
-            let hf_id = *self.field_ids[*idx].get();
-            debug_assert!(hf_id != -1, "Accessing header field ID before registering");
-            return hf_id;
-        }
-    }
-}
-
-#[derive(Default)]
-struct EttIndices {
-    // Storage for ETT indices, must live beyond registration, initialised to -1
-    storage: Box<UnsafeCell<Vec<c_int>>>,
-    // Storage for pointers to the indices above for registration
-    ptr_storage: Box<UnsafeCell<Vec<*mut c_int>>>,
-}
-impl EttIndices {
-    pub fn new(num_ett: usize) -> Self {
-        Self {
-            storage: Box::new(UnsafeCell::new(vec![-1; num_ett])),
-            ptr_storage: Box::new(UnsafeCell::new(Vec::with_capacity(num_ett))),
-        }
-    }
-
-    pub fn register_all(&self) {
-        // unsafe {
-        // epan_sys::proto_register_subtree_array(ptr_storage as _, ptr_storage.len() as i32);
-        // }
-        unimplemented!()
-    }
-
-    pub fn get_ett(&self, idx: usize) -> c_int {
-        unsafe { (*self.storage.get())[idx] }
-    }
-}
-
 #[derive(Default)]
 struct DissectorTables {
     tables: HashMap<String, epan_sys::dissector_table_t>,
@@ -532,23 +432,5 @@ impl FieldDisplay {
             FieldDisplay::AbsoluteTimeUnix => epan_sys::field_display_e_ABSOLUTE_TIME_UNIX,
             FieldDisplay::BaseStrWsp => epan_sys::field_display_e_BASE_STR_WSP,
         }
-    }
-}
-
-impl FieldDefinition {
-    pub fn new(id: &str, name: &str) -> Self {
-        Self {
-            id: id.to_string(),
-            name: name.to_string(),
-            field_type: FieldType::None,
-            display: FieldDisplay::None,
-            strings: None,
-        }
-    }
-
-    fn into_hf_info(self, proto_name: &CString) -> FieldInfo {
-        // Convert the field definition into Wireshark's hf_register_info
-        // This would construct the actual C struct hf_register_info to be added to hf array
-        unimplemented!()
     }
 }
