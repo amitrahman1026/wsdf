@@ -1,6 +1,8 @@
 use epan_sys;
-use std::ffi::{c_int, c_void, CString};
-use thiserror::Error;
+use std::{
+    collections::HashMap,
+    ffi::{c_int, c_void, CString},
+};
 
 pub struct Protocol {
     // Static data for this protocol
@@ -9,7 +11,6 @@ pub struct Protocol {
     ett_handles: Vec<c_int>,
     // Pointers to ett_handles vector above, registered to the protocol
     ett_handles_ptrs: Vec<*mut c_int>,
-    id: *const c_int,
     // The actual dissector implementation
     pub(crate) dissector_fn: Dissector,
     field_defs: Vec<Field>,
@@ -34,6 +35,7 @@ impl Protocol {
                 .collect();
 
             Box::into_raw(values.into_boxed_slice()) as *const epan_sys::_value_string
+        // TODO: Check memory
         } else {
             std::ptr::null()
         };
@@ -59,8 +61,8 @@ impl Protocol {
             },
         };
 
-        let hf_ptr = Box::into_raw(Box::new(hf_info));
-        epan_sys::proto_register_field_array(self.proto_handle, hf_ptr, 1);
+        let hf_ptr: *mut epan_sys::hf_register_info = Box::into_raw(Box::new(hf_info)); // TODO: stop intentially leaking?
+        epan_sys::proto_register_field_array(self.get_proto_handle(), hf_ptr, 1);
 
         if handle != -1 {
             self.field_handles.push(FieldHandle {
@@ -220,12 +222,11 @@ impl ProtocolBuilder {
                 to_c_str(&self.id),
                 to_c_str(&self.filter),
             );
-
+            debug_assert!(proto_handle != -1);
             Ok(Protocol {
                 proto_handle,
                 ett_handles: vec![-1; 1],
                 ett_handles_ptrs: Vec::new(),
-                id: std::ptr::null(),
                 dissector_fn: dissector,
                 field_defs: self.fields,   // Store the field definitions
                 field_handles: Vec::new(), // Will be populated during registration
@@ -267,6 +268,7 @@ impl PacketInfo {
 }
 
 pub struct Tree<'a> {
+    pinfo: *mut epan_sys::packet_info,
     tree: *mut epan_sys::proto_tree,
     tvb: *mut epan_sys::tvbuff,
     parent: *mut epan_sys::proto_node,
@@ -276,25 +278,27 @@ pub struct Tree<'a> {
 
 impl<'a> Tree<'a> {
     unsafe fn new(
-        proto: &'a Protocol,
+        pinfo: *mut epan_sys::packet_info,
+        protocol: &'a Protocol,
         tree: *mut epan_sys::proto_tree,
         tvb: *mut epan_sys::tvbuff,
         parent: *mut epan_sys::proto_node,
         offset: i32,
     ) -> Self {
         Self {
+            pinfo,
             tree,
             tvb,
             parent,
-            proto,
+            proto: protocol,
             offset,
         }
     }
-    pub fn add_item(&mut self, field: &Field, length: i32) -> Option<TreeItem> {
+    pub fn add_item(&mut self, field_id: &str, length: i32) -> Option<TreeItem> {
         unsafe {
             let item = epan_sys::proto_tree_add_item(
                 self.tree,
-                self.proto.get_field_handle(&field.id)?.handle,
+                self.proto.get_field_handle(field_id)?.handle,
                 self.tvb,
                 self.offset,
                 length,
@@ -310,12 +314,13 @@ impl<'a> Tree<'a> {
             }
         }
     }
-    pub fn add_subtree(&mut self, field: &Field, length: i32) -> Option<Tree<'a>> {
-        let item = self.add_item(field, length)?;
+    pub fn add_subtree(&mut self, field_id: &str, length: i32) -> Option<Tree<'a>> {
+        let item = self.add_item(field_id, length)?;
         unsafe {
             let subtree = epan_sys::proto_item_add_subtree(item.item, self.proto.get_ett_handle(0));
 
             Some(Tree::new(
+                self.pinfo,
                 self.proto,
                 subtree,
                 self.tvb,
@@ -350,23 +355,35 @@ impl TreeItem {
 
 /// The dissector table where subdissectors you want to call are registered.
 /// For more information https://gitlab.com/wireshark/wireshark/blob/ccd96c6f65ac507b8f2785385f31b874b3459f6b/doc/README.dissector#L2339
+#[derive(Clone)]
 pub enum DissectorDecodeFrom {
     DecodeAs(String),
     Uint(String, Vec<u32>),
 }
 
-pub type DissectorFn = Box<dyn Fn(&mut Tvb, &PacketInfo, &mut Tree) -> i32>;
-pub struct Dissector(DissectorFn);
+pub struct Dissector {
+    inner: Box<dyn Fn(&mut Tree) -> i32>,
+}
+
 impl Dissector {
     pub fn new<F>(f: F) -> Self
     where
-        F: Fn(&mut Tvb, &PacketInfo, &mut Tree) -> i32 + 'static,
+        F: Fn(&mut Tree) -> i32 + 'static,
     {
-        Dissector(Box::new(f))
+        Dissector { inner: Box::new(f) }
     }
 
-    pub fn call(&self, tvb: &mut Tvb, pinfo: &PacketInfo, tree: &mut Tree) -> i32 {
-        (self.0)(tvb, pinfo, tree)
+    // This is where wireshark presents a packet to the ffi interface
+    pub unsafe fn dispatch(
+        &self,
+        tvb: *mut epan_sys::tvbuff,
+        pinfo: *mut epan_sys::packet_info,
+        proto_tree: *mut epan_sys::proto_tree,
+        protocol: &Protocol,
+    ) -> c_int {
+        let mut tree = Tree::new(pinfo, protocol, proto_tree, tvb, proto_tree, 0);
+        //
+        (self.inner)(&mut tree)
     }
 }
 
@@ -564,103 +581,111 @@ fn to_c_str(s: &str) -> *const i8 {
 static mut PLUGIN: Option<Plugin> = None;
 
 pub struct Plugin {
-    protocols: Vec<Protocol>,
+    // Right now I tied the lifetime of all the protocols to the static PLUGIN
+    // But we can move to use an allocator as we simplify
+    protocols: HashMap<String, Protocol>,
 }
 
 impl Plugin {
     pub fn new() -> Self {
         Self {
-            protocols: Vec::new(),
+            protocols: HashMap::new(),
         }
     }
-    pub fn add_protocol(&mut self, protocol: Protocol) {
-        self.protocols.push(protocol);
+    pub fn add_protocol(&mut self, id: &str, protocol: Protocol) {
+        self.protocols.insert(id.to_owned(), protocol);
     }
     pub unsafe fn get() -> &'static mut Self {
         PLUGIN.as_mut().expect("Plugin not initialized")
     }
 }
 
-unsafe extern "C" fn proto_register_protos() {
+pub unsafe extern "C" fn proto_register_protos() {
     let plugin = Plugin::get();
-    let protocol = register_example_protocol().unwrap();
-    plugin.add_protocol(protocol);
-    // Register each protocol
-    for protocol in &mut plugin.protocols {
-        // Register fields from field_defs
-        let fields_to_register = protocol.field_defs.clone();
+    let id = "example";
+    let protocol = build_example_protocol(id).unwrap();
+    // TODO: we can even move this plugin add_protocol to
+    // inside build because of the singleton pattern
+    plugin.add_protocol(id, protocol);
 
-        for field in fields_to_register {
-            protocol
-                .register_field(&field)
-                .expect("Failed to register field");
-        }
-
-        // Register ETT
-        let ett_ptrs: Vec<_> = protocol
-            .ett_handles
-            .iter_mut()
-            .map(|h| h as *mut _)
-            .collect();
-        epan_sys::proto_register_subtree_array(ett_ptrs.as_ptr(), ett_ptrs.len() as i32);
-    }
+    let _: Vec<_> = plugin
+        .protocols
+        .iter_mut()
+        .map(|(_, protocol)| {
+            // Register each Protocol's header fields
+            let fields_to_register = protocol.field_defs.clone();
+            for field in fields_to_register {
+                protocol
+                    .register_field(&field)
+                    .expect("Failed to register field");
+            }
+            // Then register ETT either here or via Tree -> need to simplify Tree
+        })
+        .collect();
 }
 
-unsafe extern "C" fn proto_reg_handoff() {
+pub unsafe extern "C" fn proto_reg_handoff() {
     // Handoff implementation for subdissector tables
     let plugin = Plugin::get();
 
-    for protocol in &plugin.protocols {
-        // Create dissector handle
-        let handle =
-            epan_sys::create_dissector_handle(Some(dissector_handler), protocol.proto_handle);
+    // NOTE: This registers the dissector for ALL of the protocols
+    // this can also be made an associative function of plugin / access via singleton
+    let _: Vec<_> = plugin
+        .protocols
+        .iter()
+        .map(|(_, protocol)| {
+            // Create dissector handle
+            let handle =
+                epan_sys::create_dissector_handle(Some(dissector_handler), protocol.proto_handle);
 
-        // Register for each decode-from definition
-        if let Some(defs) = &protocol.match_definitions {
-            for def in defs {
-                match def {
-                    DissectorDecodeFrom::DecodeAs(table) => {
-                        let table = CString::new(table.as_str()).unwrap();
-                        epan_sys::dissector_add_for_decode_as(table.as_ptr(), handle);
-                    }
-                    DissectorDecodeFrom::Uint(table, values) => {
-                        let table = CString::new(table.as_str()).unwrap();
-                        for &value in values {
-                            epan_sys::dissector_add_uint(table.as_ptr(), value, handle);
+            // Register for each decode-from definition
+            if let Some(defs) = &protocol.match_definitions {
+                for def in defs {
+                    match def {
+                        DissectorDecodeFrom::DecodeAs(table) => {
+                            let table = CString::new(table.as_str()).unwrap();
+                            epan_sys::dissector_add_for_decode_as(table.as_ptr(), handle);
+                        }
+                        DissectorDecodeFrom::Uint(table, values) => {
+                            let table = CString::new(table.as_str()).unwrap();
+                            for &value in values {
+                                epan_sys::dissector_add_uint(table.as_ptr(), value, handle);
+                            }
                         }
                     }
                 }
             }
-        }
-    }
+        })
+        .collect();
 }
 
-unsafe extern "C" fn dissector_handler(
+// This would be a free function that would be expetected by create_dissector_handle()
+// TODO: figure out how to encapsulate this
+pub unsafe extern "C" fn dissector_handler(
     tvb: *mut epan_sys::tvbuff,
     pinfo: *mut epan_sys::_packet_info,
     tree: *mut epan_sys::proto_tree,
-    data: *mut c_void,
+    _data: *mut c_void,
 ) -> c_int {
-    let mut tvb_wrapper = Tvb::new(tvb);
-    let pinfo_wrapper = PacketInfo::new(pinfo);
-    let protocol = (data as *mut Protocol).as_ref().unwrap();
+    let curr_proto = (*pinfo).current_proto;
 
-    let mut tree_wrapper = Tree::new(protocol, tree, tvb, std::ptr::null_mut(), 0);
+    // Here we can always retrieve the name of protocol from pinfo
 
-    protocol
-        .dissector_fn
-        .call(&mut tvb_wrapper, &pinfo_wrapper, &mut tree_wrapper)
+    let id = std::ffi::CStr::from_ptr(curr_proto).to_str().unwrap();
+    let plugin = Plugin::get();
+    let protocol = plugin.protocols.get(id).unwrap();
+    (protocol.dissector_fn).dispatch(tvb, pinfo, tree, protocol)
 }
 
 #[no_mangle]
 pub extern "C" fn plugin_describe() -> u32 {
+    // TODO: this + metadata about wireshark version etc can all be put into a marcro
     epan_sys::WS_PLUGIN_DESC_EPAN
 }
 
 #[no_mangle]
 pub extern "C" fn plugin_register() {
     unsafe {
-        // Initialize global plugin if not already done
         if PLUGIN.is_none() {
             PLUGIN = Some(Plugin::new());
         }
@@ -676,12 +701,22 @@ pub extern "C" fn plugin_register() {
     }
 }
 
-pub fn register_example_protocol() -> Result<Protocol, RegistrationError> {
-    let protocol = ProtocolBuilder::new("Example Protocol", "example", "example")
-        .dissector(Dissector::new(|tvb, pinfo, tree| {
-            // Implementation of example dissector
-            // Add fields to tree, etc
-            0
+pub fn build_example_protocol(id: &str) -> Result<Protocol, RegistrationError> {
+    let name = "Example Protocol";
+    let filter = "example";
+    let protocol = ProtocolBuilder::new(name, id, filter)
+        .dissector(Dissector::new(|tree: &mut Tree<'_>| {
+            tree.add_item("version", 1).unwrap();
+            let _ = tree.add_subtree("header", 0);
+            unsafe {
+                epan_sys::col_clear((*tree.pinfo).cinfo, epan_sys::COL_INFO as i32);
+                epan_sys::col_set_str(
+                    (*tree.pinfo).cinfo,
+                    epan_sys::COL_PROTOCOL as _,
+                    b"WSDF PROTO\0".as_ptr() as _,
+                );
+                epan_sys::tvb_reported_length(tree.tvb) as i32
+            }
         }))
         .field(
             FieldBuilder::new("version", "Version", "example.version")
@@ -691,7 +726,8 @@ pub fn register_example_protocol() -> Result<Protocol, RegistrationError> {
         )
         .decode_from(DissectorDecodeFrom::Uint("ip.proto".into(), vec![17]))
         .build()?;
-
+    // TODO: We can move registration into the build step because at this point,
+    //  we have all the information we need to build + fully register
     Ok(protocol)
 }
 
