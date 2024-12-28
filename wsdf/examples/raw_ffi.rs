@@ -373,14 +373,13 @@ pub unsafe extern "C" fn proto_register_wsdfproto() {
         ei.as_ptr() as *mut epan_sys::ei_register_info,
         ei.len() as i32,
     );
-
-    // Register dissector, using create_dissector_handle is the new reccomended way
-    WSDFPROTO_HANDLE = epan_sys::create_dissector_handle(Some(dissect_wsdfproto), PROTO_WSDFPROTO);
 }
 
 // Protocol handoff registration
 #[no_mangle]
 pub unsafe extern "C" fn proto_reg_handoff_wsdfproto() {
+    // Register dissector, using create_dissector_handle is the new reccomended way
+    WSDFPROTO_HANDLE = epan_sys::create_dissector_handle(Some(dissect_wsdfproto), PROTO_WSDFPROTO);
     // Subdissectors will register themselves with the dissector table using their unique identifier using one of the following APIs:
     epan_sys::dissector_add_uint(
         b"ip.proto\0".as_ptr() as *const i8, // Register for IP protocol
@@ -388,7 +387,8 @@ pub unsafe extern "C" fn proto_reg_handoff_wsdfproto() {
         WSDFPROTO_HANDLE,
     );
 }
-// Final step: Protocol dissector -> pluginisation needs
+// Final step: Protocol dissector -> pluginisation needs, pluging_describe() plugin_register(),  plugin_want_major, plugin_want_minor MUST publicly visible symbols
+// Optionally plugin_version maybe be made visible as well
 #[no_mangle]
 pub extern "C" fn plugin_describe() -> u32 {
     wsdf::epan_sys::WS_PLUGIN_DESC_EPAN
@@ -411,11 +411,11 @@ static plugin_version: [std::ffi::c_char; 6usize] = [48i8, 46i8, 48i8, 46i8, 49i
 #[no_mangle]
 #[used]
 #[allow(non_upper_case_globals)]
-static plugin_want_major: std::ffi::c_int = 4;
+static plugin_want_major: std::ffi::c_uint = epan_sys::WIRESHARK_VERSION_MAJOR;
 #[no_mangle]
 #[used]
 #[allow(non_upper_case_globals)]
-static plugin_want_minor: std::ffi::c_int = 4;
+static plugin_want_minor: std::ffi::c_uint = epan_sys::WIRESHARK_VERSION_MINOR;
 
 // Helper function to allocate memory for strings to be used within the lifetime of dissection
 unsafe fn wmem_strdup_printf(

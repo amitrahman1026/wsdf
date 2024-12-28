@@ -78,7 +78,7 @@ impl Protocol {
             Err(RegistrationError::RegistrationFailed)
         }
     }
-    // Register ETT array during protocol registration
+    // This should be called by the Protocol.register routine unless you know what you're doing
     unsafe fn register_ett_array(&mut self, num_ett: usize) {
         // Initialize ett handles with -1
         self.ett_handles.resize(num_ett, -1);
@@ -94,10 +94,6 @@ impl Protocol {
         epan_sys::proto_register_subtree_array(ett_ptrs.as_ptr(), num_ett as c_int);
     }
     fn get_ett_handle(&self, idx: c_int) -> c_int {
-        if idx < 0 {
-            panic!("ETT handle index must be >= 0");
-        }
-
         self.ett_handles.get(idx as usize).expect("ETT handle index out of bounds, use set_num_ett during protocol creation to set the number of ETT fields").clone()
     }
     // Get the handle to the protocol's ETT
@@ -107,6 +103,22 @@ impl Protocol {
     // Get the handle to a field that has already been registered
     fn get_field_handle(&self, abbrev: &str) -> Option<&FieldHandle> {
         self.field_handles.iter().find(|field| field.id == abbrev)
+    }
+
+    // Routine to be called to register all fields
+    fn register(&mut self) {
+        let fields_to_register = self.field_defs.clone();
+        unsafe {
+            for field in fields_to_register {
+                self.register_field(&field)
+                    .expect("Failed to register field");
+            }
+            // Registering ETT is basically saying how many types of trees you have
+            // We need to convert this into something more dynamic so that maybe it's easier
+            // for users to add their custom types with some tree_type_id lookup, then
+            self.register_ett_array(1);
+            // TODO: Register expert items here as well
+        }
     }
 }
 
@@ -294,8 +306,8 @@ impl PacketInfo {
     pub fn new(ptr: *mut epan_sys::_packet_info) -> Self {
         Self { ptr }
     }
-    // This raw pointer is maba
-    pub fn alloc_string(&self, s: &str) -> *const i8 {
+    // This raw pointer is managed by the block allocator of
+    pub unsafe fn alloc_raw_string(&self, s: &str) -> *const i8 {
         let c_str = std::ffi::CString::new(s).unwrap();
         unsafe {
             let size = s.len() + 1; // +1 for null terminator
@@ -304,7 +316,7 @@ impl PacketInfo {
             ptr
         }
     }
-    pub fn alloc_bytes(&self, bytes: &[u8]) -> *mut u8 {
+    pub unsafe fn alloc_bytes(&self, bytes: &[u8]) -> *mut u8 {
         unsafe {
             let ptr = epan_sys::wmem_alloc((*self.ptr).pool, bytes.len()) as *mut u8;
             std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
@@ -312,8 +324,8 @@ impl PacketInfo {
         }
     }
     pub fn set_column_text(&self, col: Column, text: &str) {
-        let text = self.alloc_string(text);
         unsafe {
+            let text = self.alloc_raw_string(text);
             epan_sys::col_clear((*self.ptr).cinfo, col as i32);
             epan_sys::col_add_str((*self.ptr).cinfo, col as i32, text);
         }
@@ -401,15 +413,15 @@ impl TreeItem {
         Self { ptr, pinfo }
     }
     pub fn set_text(&mut self, text: &str) {
-        let text = self.pinfo.alloc_string(text);
         unsafe {
+            let text = self.pinfo.alloc_raw_string(text);
             epan_sys::proto_item_set_text(self.ptr, text);
         }
     }
 
     pub fn append_text(&mut self, text: &str) {
-        let text = self.pinfo.alloc_string(text);
         unsafe {
+            let text = self.pinfo.alloc_raw_string(text);
             epan_sys::proto_item_append_text(self.ptr, text);
         }
     }
@@ -424,6 +436,7 @@ pub enum DissectorDecodeFrom {
 }
 
 pub struct Dissector {
+    // TODO: Can we make this an impl trait and it will still work?
     inner: Box<dyn Fn(&mut Tree) -> i32>,
 }
 
@@ -437,6 +450,17 @@ impl Dissector {
 
     // This is where wireshark presents a packet to the ffi interface
     pub unsafe fn dispatch(
+        &self,
+        tvb: *mut epan_sys::tvbuff,
+        pinfo: *mut epan_sys::packet_info,
+        proto_tree: *mut epan_sys::proto_tree,
+        protocol: &Protocol,
+    ) -> c_int {
+        let mut tree = Tree::new(protocol, pinfo, proto_tree, tvb, 0);
+        //
+        (self.inner)(&mut tree)
+    }
+    pub unsafe fn dispatch2(
         &self,
         tvb: *mut epan_sys::tvbuff,
         pinfo: *mut epan_sys::packet_info,
@@ -918,8 +942,9 @@ impl Plugin {
             protocols: HashMap::new(),
         }
     }
-    pub fn add_protocol(&mut self, id: &str, protocol: Protocol) {
-        self.protocols.insert(id.to_owned(), protocol);
+    pub fn add_protocol(&mut self, protocol: Protocol) {
+        let id = protocol.abbrev.clone();
+        self.protocols.insert(id, protocol);
     }
     pub unsafe fn get() -> &'static mut Self {
         PLUGIN.as_mut().expect("Plugin not initialized")
@@ -928,26 +953,16 @@ impl Plugin {
 
 pub unsafe extern "C" fn proto_register_protos() {
     let plugin = Plugin::get();
-    let id = "example";
-    let protocol = build_example_protocol(id).unwrap();
+    let protocol = build_example_protocol().unwrap();
     // TODO: we can even move this plugin add_protocol to
     // inside build because of the singleton pattern
-    plugin.add_protocol(id, protocol);
+    plugin.add_protocol(protocol);
 
     let _: Vec<_> = plugin
         .protocols
         .iter_mut()
         .map(|(_, protocol)| {
-            // Register each Protocol's header fields
-            let fields_to_register = protocol.field_defs.clone();
-            for field in fields_to_register {
-                protocol
-                    .register_field(&field)
-                    .expect("Failed to register field");
-            }
-            // Then register ETT either here or via Tree -> need to simplify Tree
-            // Registering ETT is basically saying how many types of trees you have
-            protocol.register_ett_array(1);
+            protocol.register();
         })
         .collect();
 }
@@ -988,7 +1003,8 @@ pub unsafe extern "C" fn proto_reg_handoff() {
 }
 
 // This would be a free function that would be expetected by create_dissector_handle()
-// TODO: figure out how to encapsulate this
+// TODO: figure out how to encapsulate this. Can this be part of protocol? and we pass the function
+// pointer from this to create_dissector_handle()
 pub unsafe extern "C" fn dissector_handler(
     tvb: *mut epan_sys::tvbuff,
     pinfo: *mut epan_sys::_packet_info,
@@ -998,10 +1014,10 @@ pub unsafe extern "C" fn dissector_handler(
     let curr_proto = (*pinfo).current_proto;
 
     // Here we can always retrieve the name of protocol from pinfo
-
     let id = std::ffi::CStr::from_ptr(curr_proto).to_str().unwrap();
     let plugin = Plugin::get();
     let protocol = plugin.protocols.get(id).unwrap();
+
     (protocol.dissector_fn).dispatch(tvb, pinfo, tree, protocol)
 }
 
@@ -1029,34 +1045,32 @@ pub extern "C" fn plugin_register() {
     }
 }
 
-pub fn build_example_protocol(id: &str) -> Result<Protocol, RegistrationError> {
-    let name = "Example Protocol";
-    let filter = "example";
-    let protocol = ProtocolBuilder::new(name, id, filter)
+pub fn build_example_protocol() -> Result<Protocol, RegistrationError> {
+    let name = "WSDF Example Protocol";
+    let abbrev = "wsdf";
+    let filter = "wsdf_example";
+    let protocol = ProtocolBuilder::new(name, abbrev, filter)
         .dissector(Dissector::new(|tree: &mut Tree<'_>| {
-            let _ = tree.add_item("version", 1, Encoding::BigEndian).unwrap();
-            // let _ = tree.add_subtree("header", 0);
-            // tree.pinfo.set_column_text(Column::Protocol, "test");
-            unsafe {
-                // epan_sys::col_clear((*tree.pinfo).cinfo, epan_sys::COL_INFO as i32);
-                // epan_sys::col_set_str(
-                //     (*tree.pinfo).cinfo,
-                //     epan_sys::COL_PROTOCOL as _,
-                //     b"WSDF PROTO\0".as_ptr() as _,
-                // );
-                epan_sys::tvb_reported_length(tree.tvb.ptr) as i32
-            }
+            let _ = tree.add_item("sub1", 1, Encoding::BigEndian).unwrap();
+            tree.pinfo.set_column_text(Column::Protocol, "WSDF Example");
+            let mut type_tree_item = tree.add_item("sub2", 2, Encoding::BigEndian).unwrap();
+            type_tree_item.append_text(" appended some text to 'sub2' tree item");
+            unsafe { epan_sys::tvb_reported_length(tree.tvb.ptr) as i32 }
         }))
         .field(
-            FieldBuilder::new("version", "Version", "example.version")
+            FieldBuilder::new("sub1", "Subtree field 1", "wsdf.sub1")
+                .field_type(FieldType::Uint8)
+                .display(FieldDisplay::BaseDec)
+                .build()?,
+        )
+        .field(
+            FieldBuilder::new("sub2", "Subtree field 2", "wsdf.sub2")
                 .field_type(FieldType::Uint8)
                 .display(FieldDisplay::BaseDec)
                 .build()?,
         )
         .decode_from(DissectorDecodeFrom::Uint("ip.proto".into(), vec![17]))
         .build()?;
-    // TODO: We can move registration into the build step because at this point,
-    //  we have all the information we need to build + fully register
     Ok(protocol)
 }
 
