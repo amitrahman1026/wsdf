@@ -14,9 +14,17 @@ pub struct Protocol {
     ett_handles: Vec<c_int>,
     // The actual dissector implementation
     pub(crate) dissector_fn: Dissector,
+
     field_defs: Vec<Field>,
     // All registered fields for this protocol
     field_handles: Vec<FieldHandle>,
+
+    expert_info_defs: Vec<ExpertFieldInfo>,
+    // Lookup for expert field handles
+    expert_fields_handles: HashMap<String, ExpertFieldHandle>,
+    // Expert field modules
+    expert_module: *mut epan_sys::expert_module_t,
+
     // Pending match conditions for this protocol that have not yet been registered
     match_definitions: Option<Vec<DissectorDecodeFrom>>,
 }
@@ -62,7 +70,7 @@ impl Protocol {
             },
         };
 
-        let hf_ptr: *mut epan_sys::hf_register_info = Box::into_raw(Box::new(hf_info)); // TODO: stop intentially leaking?
+        let hf_ptr: *mut epan_sys::hf_register_info = Box::into_raw(Box::new(hf_info));
         epan_sys::proto_register_field_array(self.get_proto_handle(), hf_ptr, 1);
 
         if handle != -1 {
@@ -75,10 +83,13 @@ impl Protocol {
 
             Ok(())
         } else {
+            let _ = Box::from_raw(hf_ptr); // Clean up
             Err(RegistrationError::RegistrationFailed)
         }
     }
     // This should be called by the Protocol.register routine unless you know what you're doing
+    // TODO: possible refactor is to let users registers ETT with string identifiers
+    // and we encapsulate the num_ett parameter internally complete. e.g. a map of ett types
     unsafe fn register_ett_array(&mut self, num_ett: usize) {
         // Initialize ett handles with -1
         self.ett_handles.resize(num_ett, -1);
@@ -105,9 +116,75 @@ impl Protocol {
         self.field_handles.iter().find(|field| field.id == abbrev)
     }
 
-    // Routine to be called to register all fields
+    unsafe fn register_expert_info(
+        &mut self,
+        expert_module: *mut epan_sys::expert_module_t,
+        info: &ExpertFieldInfo,
+    ) -> Result<(), RegistrationError> {
+        let expert_field: epan_sys::expert_field = epan_sys::expert_field { ei: -1, hf: -1 };
+        let expert_field_ptr = Box::into_raw(Box::new(expert_field));
+
+        // These resources just need to be alive for the registration
+        let name = to_c_str(&format!("{}.{}", self.filter, info.id));
+        let summary = to_c_str(&info.summary);
+
+        let ei_info = epan_sys::ei_register_info {
+            ids: expert_field_ptr as *mut epan_sys::expert_field,
+            eiinfo: epan_sys::expert_field_info {
+                name,
+                group: info.group.to_u32() as i32,
+                severity: info.severity.to_u32() as i32,
+                summary,
+                id: 0,
+                protocol: std::ptr::null(),
+                orig_severity: 0,
+                hf_info: epan_sys::hf_register_info {
+                    p_id: std::ptr::null_mut(), // overwrite with address of expert_field's hf
+                    hfinfo: epan_sys::header_field_info {
+                        name: std::ptr::null_mut(),
+                        abbrev: std::ptr::null_mut(),
+                        type_: epan_sys::ftenum_FT_NONE,
+                        display: epan_sys::field_display_e_BASE_NONE as i32,
+                        strings: std::ptr::null(),
+                        bitmask: 0,
+                        blurb: std::ptr::null(),
+                        id: -1,
+                        parent: 0,
+                        ref_type: epan_sys::hf_ref_type_HF_REF_TYPE_NONE,
+                        same_name_prev_id: -1,
+                        same_name_next: std::ptr::null_mut(),
+                    },
+                },
+            },
+        };
+
+        let ei_ptr = Box::into_raw(Box::new(ei_info));
+
+        epan_sys::expert_register_field_array(expert_module, ei_ptr, 1);
+
+        if (*(*ei_ptr).ids).ei != -1 && (*(*ei_ptr).ids).hf != -1 {
+            self.expert_fields_handles.insert(
+                info.id.clone(),
+                ExpertFieldHandle {
+                    ei: (*(*ei_ptr).ids).ei,
+                    hf: (*(*ei_ptr).ids).hf,
+                },
+            );
+            Ok(())
+        } else {
+            let _ = Box::from_raw(expert_field_ptr);
+            let _ = Box::from_raw(ei_ptr);
+            Err(RegistrationError::RegistrationFailed)
+        }
+    }
+    fn get_expert_field(&self, id: &str) -> Option<&ExpertFieldHandle> {
+        self.expert_fields_handles.get(id)
+    }
+    // Routine to be called to register all header fields, ETT types, expert fields
     fn register(&mut self) {
         let fields_to_register = self.field_defs.clone();
+        let expert_infos_to_register = self.expert_info_defs.clone();
+
         unsafe {
             for field in fields_to_register {
                 self.register_field(&field)
@@ -118,6 +195,14 @@ impl Protocol {
             // for users to add their custom types with some tree_type_id lookup, then
             self.register_ett_array(1);
             // TODO: Register expert items here as well
+            if !expert_infos_to_register.is_empty() {
+                let expert_module = epan_sys::expert_register_protocol(self.proto_handle);
+                self.expert_module = expert_module;
+                for expert_info in expert_infos_to_register {
+                    self.register_expert_info(expert_module, &expert_info)
+                        .expect("Failed to register expert info");
+                }
+            }
         }
     }
 }
@@ -203,12 +288,26 @@ pub struct FieldHandle {
     _ptr: *mut epan_sys::hf_register_info,
 }
 
+pub struct ExpertFieldHandle {
+    ei: c_int,
+    hf: c_int,
+}
+
+#[derive(Clone)]
+pub struct ExpertFieldInfo {
+    id: String,
+    group: ExpertGroup,
+    severity: ExpertSeverity,
+    summary: String,
+}
+
 pub struct ProtocolBuilder {
     name: String,
     abbrev: String,
     filter: String,
     dissector_fn: Option<Dissector>,
     fields: Vec<Field>,
+    expert_infos: Vec<ExpertFieldInfo>,
     match_definitions: Vec<DissectorDecodeFrom>,
 }
 
@@ -224,6 +323,7 @@ impl ProtocolBuilder {
             filter: filter.into(),
             dissector_fn: None,
             fields: Vec::new(),
+            expert_infos: Vec::new(),
             match_definitions: Vec::new(),
         }
     }
@@ -235,6 +335,22 @@ impl ProtocolBuilder {
 
     pub fn field(mut self, field: Field) -> Self {
         self.fields.push(field);
+        self
+    }
+
+    pub fn expert_info(
+        mut self,
+        id: impl Into<String>,
+        group: ExpertGroup,
+        severity: ExpertSeverity,
+        summary: impl Into<String>,
+    ) -> Self {
+        self.expert_infos.push(ExpertFieldInfo {
+            id: id.into(),
+            group,
+            severity,
+            summary: summary.into(),
+        });
         self
     }
 
@@ -253,6 +369,7 @@ impl ProtocolBuilder {
                 to_c_str(&self.abbrev),
                 to_c_str(&self.filter),
             );
+            // TODO: check if we need to register expert module here
             debug_assert!(proto_handle != -1);
             Ok(Protocol {
                 name: self.name,
@@ -263,6 +380,10 @@ impl ProtocolBuilder {
                 dissector_fn: dissector,
                 field_defs: self.fields,   // Store the field definitions
                 field_handles: Vec::new(), // Will be populated during registration
+                // TODO: encapsulate expert fields under Expert Module
+                expert_info_defs: self.expert_infos,
+                expert_fields_handles: HashMap::new(),
+                expert_module: std::ptr::null_mut(),
                 match_definitions: Some(self.match_definitions),
             })
         }
@@ -400,6 +521,40 @@ impl<'a> Tree<'a> {
             }
         }
     }
+    pub fn add_expert_info(
+        &mut self,
+        item: &mut TreeItem,
+        expert_id: &str,
+        text: Option<&str>,
+    ) -> Option<()> {
+        let handle = self.protocol.get_expert_field(expert_id)?;
+
+        unsafe {
+            let expert_field = epan_sys::expert_field {
+                ei: handle.ei,
+                hf: handle.hf,
+            };
+            let expert_field = Box::into_raw(Box::new(expert_field));
+            if let Some(text) = text {
+                // Custom text
+                let text_ptr = self.pinfo.alloc_raw_string(text);
+                epan_sys::expert_add_info_format(
+                    self.pinfo.ptr,
+                    item.ptr,
+                    expert_field as *mut epan_sys::expert_field,
+                    text_ptr,
+                );
+            } else {
+                // Default text from registration
+                epan_sys::expert_add_info(
+                    self.pinfo.ptr,
+                    item.ptr,
+                    expert_field as *mut epan_sys::expert_field,
+                );
+            }
+        }
+        Some(())
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -457,18 +612,6 @@ impl Dissector {
         protocol: &Protocol,
     ) -> c_int {
         let mut tree = Tree::new(protocol, pinfo, proto_tree, tvb, 0);
-        //
-        (self.inner)(&mut tree)
-    }
-    pub unsafe fn dispatch2(
-        &self,
-        tvb: *mut epan_sys::tvbuff,
-        pinfo: *mut epan_sys::packet_info,
-        proto_tree: *mut epan_sys::proto_tree,
-        protocol: &Protocol,
-    ) -> c_int {
-        let mut tree = Tree::new(protocol, pinfo, proto_tree, tvb, 0);
-        //
         (self.inner)(&mut tree)
     }
 }
@@ -922,6 +1065,7 @@ pub enum RegistrationError {
     CStringError(#[from] std::ffi::NulError),
 }
 
+// TODO: Possibly change this to be allocated by wmem_epan scope
 fn to_c_str(s: &str) -> *const i8 {
     CString::new(s)
         .expect("String contains null byte")
@@ -1051,10 +1195,23 @@ pub fn build_example_protocol() -> Result<Protocol, RegistrationError> {
     let filter = "wsdf_example";
     let protocol = ProtocolBuilder::new(name, abbrev, filter)
         .dissector(Dissector::new(|tree: &mut Tree<'_>| {
-            let _ = tree.add_item("sub1", 1, Encoding::BigEndian).unwrap();
             tree.pinfo.set_column_text(Column::Protocol, "WSDF Example");
-            let mut type_tree_item = tree.add_item("sub2", 2, Encoding::BigEndian).unwrap();
-            type_tree_item.append_text(" appended some text to 'sub2' tree item");
+            tree.pinfo
+                .set_column_text(Column::Info, "Set some column information here.");
+
+            let mut subtree_tree_item1 = tree.add_item("sub1", 1, Encoding::BigEndian).unwrap();
+            tree.add_expert_info(&mut subtree_tree_item1, "expert_condition1", None);
+
+            let mut subtree_tree_item2 = tree.add_item("sub2", 2, Encoding::BigEndian).unwrap();
+
+            subtree_tree_item2.append_text(" appended some text to 'sub2' tree item");
+
+            tree.add_expert_info(
+                &mut subtree_tree_item2,
+                "expert_condition2",
+                Some("Display custom expert opinions here!"),
+            );
+
             unsafe { epan_sys::tvb_reported_length(tree.tvb.ptr) as i32 }
         }))
         .field(
@@ -1068,6 +1225,18 @@ pub fn build_example_protocol() -> Result<Protocol, RegistrationError> {
                 .field_type(FieldType::Uint8)
                 .display(FieldDisplay::BaseDec)
                 .build()?,
+        )
+        .expert_info(
+            "expert_condition1",
+            ExpertGroup::Assumption,
+            ExpertSeverity::Warn,
+            "Default expert info can go here!",
+        )
+        .expert_info(
+            "expert_condition2",
+            ExpertGroup::Sequence,
+            ExpertSeverity::Chat,
+            "Default expert info can go here!",
         )
         .decode_from(DissectorDecodeFrom::Uint("ip.proto".into(), vec![17]))
         .build()?;
