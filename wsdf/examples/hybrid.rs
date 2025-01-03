@@ -17,7 +17,7 @@ pub struct Protocol {
 
     field_defs: Vec<Field>,
     // All registered fields for this protocol
-    field_handles: Vec<FieldHandle>,
+    field_handles: HashMap<String, FieldHandle>,
 
     expert_info_defs: Vec<ExpertFieldInfo>,
     // Lookup for expert field handles
@@ -74,12 +74,20 @@ impl Protocol {
         epan_sys::proto_register_field_array(self.get_proto_handle(), hf_ptr, 1);
 
         if handle != -1 {
-            self.field_handles.push(FieldHandle {
-                handle,
-                id: field.id.clone(),
-                _ptr: hf_ptr,
-            });
-            self.field_defs.push(field.clone());
+            // self.field_handles.push(FieldHandle {
+            //     handle,
+            //     id: field.id.clone(),
+            //     _ptr: hf_ptr,
+            // });
+
+            self.field_handles.insert(
+                field.id.clone(),
+                FieldHandle {
+                    handle,
+                    id: field.id.clone(),
+                    _ptr: hf_ptr,
+                },
+            );
 
             Ok(())
         } else {
@@ -113,7 +121,7 @@ impl Protocol {
     }
     // Get the handle to a field that has already been registered
     fn get_field_handle(&self, abbrev: &str) -> Option<&FieldHandle> {
-        self.field_handles.iter().find(|field| field.id == abbrev)
+        self.field_handles.get(abbrev)
     }
 
     unsafe fn register_expert_info(
@@ -285,7 +293,7 @@ impl FieldBuilder {
 pub struct FieldHandle {
     handle: c_int,
     id: String,
-    _ptr: *mut epan_sys::hf_register_info,
+    _ptr: *mut epan_sys::hf_register_info, // TODO: Can we remove this?
 }
 
 pub struct ExpertFieldHandle {
@@ -378,8 +386,8 @@ impl ProtocolBuilder {
                 proto_handle,
                 ett_handles: vec![-1; 1], // Consider improving ergonomics of registering types of trees
                 dissector_fn: dissector,
-                field_defs: self.fields,   // Store the field definitions
-                field_handles: Vec::new(), // Will be populated during registration
+                field_defs: self.fields,       // Store the field definitions
+                field_handles: HashMap::new(), // Will be populated during registration
                 // TODO: encapsulate expert fields under Expert Module
                 expert_info_defs: self.expert_infos,
                 expert_fields_handles: HashMap::new(),
