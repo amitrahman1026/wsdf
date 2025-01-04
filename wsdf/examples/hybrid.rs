@@ -407,6 +407,9 @@ impl Tvb {
     pub fn new(ptr: *mut epan_sys::tvbuff) -> Self {
         Self { ptr, offset: 0 }
     }
+    pub unsafe fn get_ptr(&self, offset: i32, length: i32) -> *const u8 {
+        epan_sys::tvb_get_ptr(self.ptr, offset, length)
+    }
     pub fn get_uint8(&self, offset: i32) -> u8 {
         unsafe { epan_sys::tvb_get_uint8(self.ptr, offset) }
     }
@@ -418,6 +421,33 @@ impl Tvb {
                 // everything that is not Big Endian (enc as 0) is Litte endian in wireshark
                 _ => epan_sys::tvb_get_letohs(self.ptr, offset),
             }
+        }
+    }
+    pub unsafe fn new_child_real_data(
+        &self,
+        data: *const u8,
+        length: u32,
+        reported_length: u32,
+    ) -> Option<Tvb> {
+        let tvb = epan_sys::tvb_new_child_real_data(
+            self.ptr,
+            data as *mut u8,
+            length,
+            reported_length as i32,
+        );
+
+        if !tvb.is_null() {
+            Some(Tvb::new(tvb))
+        } else {
+            None
+        }
+    }
+    pub unsafe fn new_subset_remaining(&self, offset: i32) -> Option<Tvb> {
+        let tvb = epan_sys::tvb_new_subset_remaining(self.ptr, offset);
+        if !tvb.is_null() {
+            Some(Tvb::new(tvb))
+        } else {
+            None
         }
     }
     pub fn length(&self) -> i32 {
@@ -464,6 +494,10 @@ impl PacketInfo {
             epan_sys::col_clear((*self.ptr).cinfo, col as i32);
         }
     }
+    pub unsafe fn add_data_source(&self, tvb: &Tvb, name: &str) {
+        let name = self.alloc_raw_string(name);
+        epan_sys::add_new_data_source(self.ptr, tvb.ptr, name);
+    }
 }
 
 pub struct Tree<'a> {
@@ -503,6 +537,9 @@ impl<'a> Tree<'a> {
             _parent_node: parent,
             offset,
         }
+    }
+    pub fn get_reported_length(&self) -> i32 {
+        unsafe { epan_sys::tvb_reported_length(self.tvb.ptr) as i32 }
     }
     pub fn add_item(
         &mut self,
@@ -562,6 +599,44 @@ impl<'a> Tree<'a> {
             }
         }
         Some(())
+    }
+    // New Tree with a different TVB buffer but within same protocol context
+    pub unsafe fn with_tvb(&self, tvb: Tvb) -> Self {
+        Self {
+            protocol: self.protocol,
+            pinfo: self.pinfo,
+            tvb,
+            current_node: self.current_node,
+            _parent_node: self._parent_node,
+            offset: 0, // Reset offset for new buffer
+        }
+    }
+    // Provide users a way for users to be able to pass in a closure to transform data
+    // e.g. Decompression, decryption etc.
+    pub fn transform_data(
+        &mut self,
+        length: u32,
+        transform_fn: impl FnOnce(&[u8], &mut [u8]) -> Result<(), Box<dyn std::error::Error>>,
+    ) -> Option<Tree<'a>> {
+        unsafe {
+            let src_ptr = self.tvb.get_ptr(self.offset, -1);
+            let src_len = self.tvb.remaining_length(self.offset) as usize;
+            let src_data = std::slice::from_raw_parts(src_ptr, src_len);
+
+            // TODO: Check memory here as well
+            let dst_ptr = self.pinfo.alloc_bytes(&vec![0; length as usize]);
+            let dst_data = std::slice::from_raw_parts_mut(dst_ptr, length as usize);
+
+            if transform_fn(src_data, dst_data).is_err() {
+                return None;
+            }
+
+            let next_tvb = self.tvb.new_child_real_data(dst_ptr, length, length)?;
+
+            self.pinfo.add_data_source(&next_tvb, "Transformed Data");
+
+            Some(self.with_tvb(next_tvb))
+        }
     }
 }
 
@@ -1211,16 +1286,51 @@ pub fn build_example_protocol() -> Result<Protocol, RegistrationError> {
             tree.add_expert_info(&mut subtree_tree_item1, "expert_condition1", None);
 
             let mut subtree_tree_item2 = tree.add_item("sub2", 2, Encoding::BigEndian).unwrap();
-
             subtree_tree_item2.append_text(" appended some text to 'sub2' tree item");
-
             tree.add_expert_info(
                 &mut subtree_tree_item2,
                 "expert_condition2",
                 Some("Display custom expert opinions here!"),
             );
 
-            unsafe { epan_sys::tvb_reported_length(tree.tvb.ptr) as i32 }
+            // Example of handling transformed data based on flag
+            let mut flag_item = tree.add_item("flag", 1, Encoding::BigEndian).unwrap();
+            let flag_value = tree.tvb.get_uint8(tree.offset - 1);
+
+            // Example condition
+            if flag_value % 2 == 0 {
+                flag_item.append_text(" (Even flag - inverting payload)");
+
+                let payload_size: u32 = 32;
+
+                // Just inverting bytes here
+                if let Some(mut transformed_tree) = tree.transform_data(payload_size, |src, dst| {
+                    for (s, d) in src.iter().zip(dst.iter_mut()) {
+                        *d = !s;
+                    }
+                    Ok(())
+                }) {
+                    let mut payload_item = transformed_tree
+                        .add_item("payload", payload_size as i32, Encoding::NA)
+                        .unwrap();
+
+                    tree.add_expert_info(
+                        &mut payload_item,
+                        "expert_payload",
+                        Some("Payload was inverted due to even flag"),
+                    );
+                }
+            } else {
+                flag_item.append_text(" (Odd flag - payload unchanged)");
+                let mut payload_item = tree.add_item("payload", 4, Encoding::NA).unwrap();
+                tree.add_expert_info(
+                    &mut payload_item,
+                    "expert_payload",
+                    Some("Payload unchanged due to odd flag"),
+                );
+            }
+
+            tree.get_reported_length()
         }))
         .field(
             FieldBuilder::new("sub1", "Subtree field 1", "wsdf.sub1")
@@ -1234,6 +1344,18 @@ pub fn build_example_protocol() -> Result<Protocol, RegistrationError> {
                 .display(FieldDisplay::BaseDec)
                 .build()?,
         )
+        .field(
+            FieldBuilder::new("flag", "Transform Flag", "wsdf.flag")
+                .field_type(FieldType::Uint8)
+                .display(FieldDisplay::BaseDec)
+                .build()?,
+        )
+        .field(
+            FieldBuilder::new("payload", "Data Payload", "wsdf.payload")
+                .field_type(FieldType::Bytes)
+                .display(FieldDisplay::None)
+                .build()?,
+        )
         .expert_info(
             "expert_condition1",
             ExpertGroup::Assumption,
@@ -1245,6 +1367,12 @@ pub fn build_example_protocol() -> Result<Protocol, RegistrationError> {
             ExpertGroup::Sequence,
             ExpertSeverity::Chat,
             "Default expert info can go here!",
+        )
+        .expert_info(
+            "expert_payload",
+            ExpertGroup::Protocol,
+            ExpertSeverity::Note,
+            "Information about payload transformation",
         )
         .decode_from(DissectorDecodeFrom::Uint("ip.proto".into(), vec![17]))
         .build()?;
