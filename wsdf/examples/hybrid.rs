@@ -5,7 +5,7 @@ use std::{
 };
 
 pub struct Protocol {
-    name: String,
+    _name: String,
     abbrev: String,
     filter: String,
     // Static data for this protocol
@@ -71,23 +71,12 @@ impl Protocol {
         };
 
         let hf_ptr: *mut epan_sys::hf_register_info = Box::into_raw(Box::new(hf_info));
+        debug_assert!(handle == -1);
         epan_sys::proto_register_field_array(self.get_proto_handle(), hf_ptr, 1);
 
         if handle != -1 {
-            // self.field_handles.push(FieldHandle {
-            //     handle,
-            //     id: field.id.clone(),
-            //     _ptr: hf_ptr,
-            // });
-
-            self.field_handles.insert(
-                field.id.clone(),
-                FieldHandle {
-                    handle,
-                    id: field.id.clone(),
-                    _ptr: hf_ptr,
-                },
-            );
+            self.field_handles
+                .insert(field.id.clone(), FieldHandle { handle });
 
             Ok(())
         } else {
@@ -202,7 +191,8 @@ impl Protocol {
             // We need to convert this into something more dynamic so that maybe it's easier
             // for users to add their custom types with some tree_type_id lookup, then
             self.register_ett_array(1);
-            // TODO: Register expert items here as well
+
+            // Registering Expert Info and just retaining the expert field handles
             if !expert_infos_to_register.is_empty() {
                 let expert_module = epan_sys::expert_register_protocol(self.proto_handle);
                 self.expert_module = expert_module;
@@ -292,8 +282,6 @@ impl FieldBuilder {
 
 pub struct FieldHandle {
     handle: c_int,
-    id: String,
-    _ptr: *mut epan_sys::hf_register_info, // TODO: Can we remove this?
 }
 
 pub struct ExpertFieldHandle {
@@ -380,7 +368,7 @@ impl ProtocolBuilder {
             // TODO: check if we need to register expert module here
             debug_assert!(proto_handle != -1);
             Ok(Protocol {
-                name: self.name,
+                _name: self.name,
                 abbrev: self.abbrev,
                 filter: self.filter,
                 proto_handle,
