@@ -1278,80 +1278,118 @@ pub fn build_example_protocol() -> Result<Protocol, RegistrationError> {
     let filter = "wsdf_example";
     let protocol = ProtocolBuilder::new(name, abbrev, filter)
         .dissector(Dissector::new(|tree: &mut Tree<'_>| {
+            // Set protocol columns
             tree.pinfo.set_column_text(Column::Protocol, "WSDF Example");
-            tree.pinfo
-                .set_column_text(Column::Info, "Set some column information here.");
 
-            let mut subtree_tree_item1 = tree.add_item("sub1", 1, Encoding::BigEndian).unwrap();
-            tree.add_expert_info(&mut subtree_tree_item1, "expert_condition1", None);
+            // First field demonstrates basic field addition and expert info
+            let mut field1_item = tree.add_item("field1", 1, Encoding::BigEndian).unwrap();
+            tree.add_expert_info(&mut field1_item, "expert_condition1", None);
 
-            let mut subtree_tree_item2 = tree.add_item("sub2", 2, Encoding::BigEndian).unwrap();
-            subtree_tree_item2.append_text(" appended some text to 'sub2' tree item");
+            // Second field shows text manipulation
+            let mut field2_item = tree.add_item("field2", 2, Encoding::BigEndian).unwrap();
+            field2_item.append_text(" (demonstrates text appending)");
             tree.add_expert_info(
-                &mut subtree_tree_item2,
+                &mut field2_item,
                 "expert_condition2",
-                Some("Display custom expert opinions here!"),
+                Some("Custom expert info with dynamic text!"),
             );
 
-            // Example of handling transformed data based on flag
-            let mut flag_item = tree.add_item("flag", 1, Encoding::BigEndian).unwrap();
+            // Compression flag and original size
+            let mut flag_item = tree.add_item("comp_flag", 1, Encoding::BigEndian).unwrap();
             let flag_value = tree.tvb.get_uint8(tree.offset - 1);
 
-            // Example condition
-            if flag_value % 2 == 0 {
-                flag_item.append_text(" (Even flag - inverting payload)");
+            let orig_size = tree.tvb.get_uint16(tree.offset, Encoding::BigEndian) as u32;
+            let mut size_item = tree.add_item("orig_size", 2, Encoding::BigEndian).unwrap();
 
-                let payload_size: u32 = 32;
+            // Example transformation based on flag
+            if flag_value & 0x80 != 0 {
+                // Check MSB for compression flag
+                flag_item.append_text(" (Compressed data)");
+                size_item
+                    .append_text(format!(" ({} bytes after decompression)", orig_size).as_str());
 
-                // Just inverting bytes here
-                if let Some(mut transformed_tree) = tree.transform_data(payload_size, |src, dst| {
-                    for (s, d) in src.iter().zip(dst.iter_mut()) {
-                        *d = !s;
+                // Our example "decompression" function simply duplicates each byte
+                // In real protocols this would be actual decompression
+                if let Some(mut decompressed_tree) = tree.transform_data(orig_size, |src, dst| {
+                    let mut dst_idx = 0;
+                    for &byte in src.iter() {
+                        if dst_idx + 1 < dst.len() {
+                            dst[dst_idx] = byte;
+                            dst[dst_idx + 1] = byte;
+                            dst_idx += 2;
+                        }
                     }
                     Ok(())
                 }) {
-                    let mut payload_item = transformed_tree
-                        .add_item("payload", payload_size as i32, Encoding::NA)
+                    // Transformed decompressed data can be added as a new field
+                    let mut payload_item = decompressed_tree
+                        .add_item("decompressed_data", orig_size as i32, Encoding::NA)
                         .unwrap();
 
                     tree.add_expert_info(
                         &mut payload_item,
-                        "expert_payload",
-                        Some("Payload was inverted due to even flag"),
+                        "expert_transform",
+                        Some("Data was decompressed - each byte duplicated"),
+                    );
+
+                    tree.pinfo.set_column_text(
+                        Column::Info,
+                        &format!("Decompressed {} bytes of data", orig_size),
                     );
                 }
             } else {
-                flag_item.append_text(" (Odd flag - payload unchanged)");
-                let mut payload_item = tree.add_item("payload", 4, Encoding::NA).unwrap();
+                flag_item.append_text(" (Uncompressed data)");
+
+                // Just show raw bytes for uncompressed data
+                let mut payload_item = tree.add_item("raw_data", 4, Encoding::NA).unwrap();
                 tree.add_expert_info(
                     &mut payload_item,
-                    "expert_payload",
-                    Some("Payload unchanged due to odd flag"),
+                    "expert_transform",
+                    Some("Uncompressed data shown directly!"),
                 );
+
+                tree.pinfo
+                    .set_column_text(Column::Info, "Uncompressed data");
             }
 
             tree.get_reported_length()
         }))
         .field(
-            FieldBuilder::new("sub1", "Subtree field 1", "wsdf.sub1")
+            FieldBuilder::new("field1", "First Field", "wsdf.field1")
                 .field_type(FieldType::Uint8)
                 .display(FieldDisplay::BaseDec)
                 .build()?,
         )
         .field(
-            FieldBuilder::new("sub2", "Subtree field 2", "wsdf.sub2")
+            FieldBuilder::new("field2", "Second Field", "wsdf.field2")
+                .field_type(FieldType::Uint16)
+                .display(FieldDisplay::BaseHex)
+                .build()?,
+        )
+        .field(
+            FieldBuilder::new("comp_flag", "Compression Flag", "wsdf.comp_flag")
                 .field_type(FieldType::Uint8)
+                .display(FieldDisplay::BaseHex)
+                .build()?,
+        )
+        .field(
+            FieldBuilder::new("orig_size", "Original Size", "wsdf.orig_size")
+                .field_type(FieldType::Uint16)
                 .display(FieldDisplay::BaseDec)
                 .build()?,
         )
         .field(
-            FieldBuilder::new("flag", "Transform Flag", "wsdf.flag")
-                .field_type(FieldType::Uint8)
-                .display(FieldDisplay::BaseDec)
-                .build()?,
+            FieldBuilder::new(
+                "decompressed_data",
+                "Decompressed Data",
+                "wsdf.decompressed",
+            )
+            .field_type(FieldType::Bytes)
+            .display(FieldDisplay::None)
+            .build()?,
         )
         .field(
-            FieldBuilder::new("payload", "Data Payload", "wsdf.payload")
+            FieldBuilder::new("raw_data", "Raw Data", "wsdf.raw")
                 .field_type(FieldType::Bytes)
                 .display(FieldDisplay::None)
                 .build()?,
@@ -1359,23 +1397,24 @@ pub fn build_example_protocol() -> Result<Protocol, RegistrationError> {
         .expert_info(
             "expert_condition1",
             ExpertGroup::Assumption,
-            ExpertSeverity::Warn,
-            "Default expert info can go here!",
+            ExpertSeverity::Note,
+            "Basic field processing completed",
         )
         .expert_info(
             "expert_condition2",
             ExpertGroup::Sequence,
             ExpertSeverity::Chat,
-            "Default expert info can go here!",
+            "Field manipulation demonstration",
         )
         .expert_info(
-            "expert_payload",
+            "expert_transform",
             ExpertGroup::Protocol,
             ExpertSeverity::Note,
-            "Information about payload transformation",
+            "Data transformation status",
         )
         .decode_from(DissectorDecodeFrom::Uint("ip.proto".into(), vec![17]))
         .build()?;
+
     Ok(protocol)
 }
 
