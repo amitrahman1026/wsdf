@@ -577,6 +577,7 @@ impl<'a> Tree<'a> {
                     expert_field as *mut epan_sys::expert_field,
                     text_ptr,
                 );
+                let _ = Box::from_raw(expert_field);
             } else {
                 // Default text from registration
                 epan_sys::expert_add_info(
@@ -584,6 +585,7 @@ impl<'a> Tree<'a> {
                     item.ptr,
                     expert_field as *mut epan_sys::expert_field,
                 );
+                let _ = Box::from_raw(expert_field);
             }
         }
         Some(())
