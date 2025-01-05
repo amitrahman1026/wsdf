@@ -70,7 +70,7 @@ impl Protocol {
             },
         };
 
-        let hf_ptr: *mut epan_sys::hf_register_info = Box::into_raw(Box::new(hf_info));
+        let hf_ptr: *mut epan_sys::hf_register_info = Box::into_raw(Box::new(hf_info)); // Header fields need to persist and wireshark takes ownership
         debug_assert!(handle == -1);
         epan_sys::proto_register_field_array(self.get_proto_handle(), hf_ptr, 1);
 
@@ -78,6 +78,7 @@ impl Protocol {
             self.field_handles
                 .insert(field.id.clone(), FieldHandle { handle });
 
+            // Don't free on success -> wireshark took ownership
             Ok(())
         } else {
             let _ = Box::from_raw(hf_ptr); // Clean up
@@ -563,29 +564,26 @@ impl<'a> Tree<'a> {
         let handle = self.protocol.get_expert_field(expert_id)?;
 
         unsafe {
-            let expert_field = epan_sys::expert_field {
+            let mut expert_field = epan_sys::expert_field {
                 ei: handle.ei,
                 hf: handle.hf,
             };
-            let expert_field = Box::into_raw(Box::new(expert_field));
             if let Some(text) = text {
                 // Custom text
                 let text_ptr = self.pinfo.alloc_raw_string(text);
                 epan_sys::expert_add_info_format(
                     self.pinfo.ptr,
                     item.ptr,
-                    expert_field as *mut epan_sys::expert_field,
+                    &mut expert_field as *mut epan_sys::expert_field,
                     text_ptr,
                 );
-                let _ = Box::from_raw(expert_field);
             } else {
                 // Default text from registration
                 epan_sys::expert_add_info(
                     self.pinfo.ptr,
                     item.ptr,
-                    expert_field as *mut epan_sys::expert_field,
+                    &mut expert_field as *mut epan_sys::expert_field,
                 );
-                let _ = Box::from_raw(expert_field);
             }
         }
         Some(())
