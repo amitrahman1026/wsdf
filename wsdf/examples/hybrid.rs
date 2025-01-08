@@ -1136,11 +1136,17 @@ pub enum RegistrationError {
     CStringError(#[from] std::ffi::NulError),
 }
 
-// TODO: Possibly change this to be allocated by wmem_epan scope
 fn to_c_str(s: &str) -> *const i8 {
-    CString::new(s)
-        .expect("String contains null byte")
-        .into_raw() as *const i8
+    // +1 for null terminator
+    let size = s.len() + 1;
+    let c_str = unsafe {
+        let ptr = epan_sys::wmem_alloc(epan_sys::wmem_epan_scope(), size) as *mut i8;
+        ptr.copy_from(s.as_ptr() as *const i8, s.len());
+        *ptr.add(s.len()) = 0;
+        ptr
+    };
+
+    c_str
 }
 
 static mut PLUGIN: Option<Plugin> = None;
