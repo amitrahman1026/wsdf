@@ -8,6 +8,7 @@
 #include <epan/proto.h>
 #include <epan/decode_as.h>
 #include <epan/expert.h>
+#include <epan/reassemble.h>
 
 
 

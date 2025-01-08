@@ -1743,6 +1743,18 @@ pub const EXPERT_CHECKSUM_DISABLED: i32 = -2;
 pub const EXPERT_CHECKSUM_UNKNOWN: i32 = -1;
 pub const EXPERT_CHECKSUM_GOOD: u32 = 0;
 pub const EXPERT_CHECKSUM_BAD: u32 = 1;
+pub const FD_DEFRAGMENTED: u32 = 1;
+pub const FD_OVERLAP: u32 = 2;
+pub const FD_OVERLAPCONFLICT: u32 = 4;
+pub const FD_MULTIPLETAILS: u32 = 8;
+pub const FD_TOOLONGFRAGMENT: u32 = 16;
+pub const FD_SUBSET_TVB: u32 = 32;
+pub const FD_PARTIAL_REASSEMBLY: u32 = 64;
+pub const FD_BLOCKSEQUENCE: u32 = 256;
+pub const FD_DATALEN_SET: u32 = 1024;
+pub const REASSEMBLE_FLAGS_NO_FRAG_NUMBER: u32 = 1;
+pub const REASSEMBLE_FLAGS_802_11_HACK: u32 = 2;
+pub const REASSEMBLE_FLAGS_AGING: u32 = 1;
 pub type __u_char = ::std::os::raw::c_uchar;
 pub type __u_short = ::std::os::raw::c_ushort;
 pub type __u_int = ::std::os::raw::c_uint;
@@ -45087,6 +45099,938 @@ extern "C" {
 }
 extern "C" {
     pub static expert_checksum_vals: [value_string; 0usize];
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct _fragment_item {
+    pub next: *mut _fragment_item,
+    pub frame: u32,
+    pub offset: u32,
+    pub len: u32,
+    pub flags: u32,
+    pub tvb_data: *mut tvbuff_t,
+}
+#[test]
+fn bindgen_test_layout__fragment_item() {
+    const UNINIT: ::std::mem::MaybeUninit<_fragment_item> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<_fragment_item>(),
+        32usize,
+        concat!("Size of: ", stringify!(_fragment_item))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<_fragment_item>(),
+        8usize,
+        concat!("Alignment of ", stringify!(_fragment_item))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).next) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_item),
+            "::",
+            stringify!(next)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).frame) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_item),
+            "::",
+            stringify!(frame)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).offset) as usize - ptr as usize },
+        12usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_item),
+            "::",
+            stringify!(offset)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).len) as usize - ptr as usize },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_item),
+            "::",
+            stringify!(len)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).flags) as usize - ptr as usize },
+        20usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_item),
+            "::",
+            stringify!(flags)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).tvb_data) as usize - ptr as usize },
+        24usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_item),
+            "::",
+            stringify!(tvb_data)
+        )
+    );
+}
+pub type fragment_item = _fragment_item;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct _fragment_head {
+    pub next: *mut _fragment_item,
+    pub first_gap: *mut _fragment_item,
+    pub ref_count: ::std::os::raw::c_uint,
+    pub contiguous_len: u32,
+    pub frame: u32,
+    pub len: u32,
+    pub fragment_nr_offset: u32,
+    pub datalen: u32,
+    pub reassembled_in: u32,
+    pub reas_in_layer_num: u8,
+    pub flags: u32,
+    pub tvb_data: *mut tvbuff_t,
+    pub error: *const ::std::os::raw::c_char,
+}
+#[test]
+fn bindgen_test_layout__fragment_head() {
+    const UNINIT: ::std::mem::MaybeUninit<_fragment_head> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<_fragment_head>(),
+        72usize,
+        concat!("Size of: ", stringify!(_fragment_head))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<_fragment_head>(),
+        8usize,
+        concat!("Alignment of ", stringify!(_fragment_head))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).next) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_head),
+            "::",
+            stringify!(next)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).first_gap) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_head),
+            "::",
+            stringify!(first_gap)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).ref_count) as usize - ptr as usize },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_head),
+            "::",
+            stringify!(ref_count)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).contiguous_len) as usize - ptr as usize },
+        20usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_head),
+            "::",
+            stringify!(contiguous_len)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).frame) as usize - ptr as usize },
+        24usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_head),
+            "::",
+            stringify!(frame)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).len) as usize - ptr as usize },
+        28usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_head),
+            "::",
+            stringify!(len)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).fragment_nr_offset) as usize - ptr as usize },
+        32usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_head),
+            "::",
+            stringify!(fragment_nr_offset)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).datalen) as usize - ptr as usize },
+        36usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_head),
+            "::",
+            stringify!(datalen)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).reassembled_in) as usize - ptr as usize },
+        40usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_head),
+            "::",
+            stringify!(reassembled_in)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).reas_in_layer_num) as usize - ptr as usize },
+        44usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_head),
+            "::",
+            stringify!(reas_in_layer_num)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).flags) as usize - ptr as usize },
+        48usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_head),
+            "::",
+            stringify!(flags)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).tvb_data) as usize - ptr as usize },
+        56usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_head),
+            "::",
+            stringify!(tvb_data)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).error) as usize - ptr as usize },
+        64usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_head),
+            "::",
+            stringify!(error)
+        )
+    );
+}
+pub type fragment_head = _fragment_head;
+pub type fragment_temporary_key = ::std::option::Option<
+    unsafe extern "C" fn(
+        pinfo: *const packet_info,
+        id: u32,
+        data: *const ::std::os::raw::c_void,
+    ) -> *mut ::std::os::raw::c_void,
+>;
+pub type fragment_persistent_key = ::std::option::Option<
+    unsafe extern "C" fn(
+        pinfo: *const packet_info,
+        id: u32,
+        data: *const ::std::os::raw::c_void,
+    ) -> *mut ::std::os::raw::c_void,
+>;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct reassembly_table {
+    pub fragment_table: *mut GHashTable,
+    pub reassembled_table: *mut GHashTable,
+    pub temporary_key_func: fragment_temporary_key,
+    pub persistent_key_func: fragment_persistent_key,
+    pub free_temporary_key_func: GDestroyNotify,
+}
+#[test]
+fn bindgen_test_layout_reassembly_table() {
+    const UNINIT: ::std::mem::MaybeUninit<reassembly_table> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<reassembly_table>(),
+        40usize,
+        concat!("Size of: ", stringify!(reassembly_table))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<reassembly_table>(),
+        8usize,
+        concat!("Alignment of ", stringify!(reassembly_table))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).fragment_table) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(reassembly_table),
+            "::",
+            stringify!(fragment_table)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).reassembled_table) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(reassembly_table),
+            "::",
+            stringify!(reassembled_table)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).temporary_key_func) as usize - ptr as usize },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(reassembly_table),
+            "::",
+            stringify!(temporary_key_func)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).persistent_key_func) as usize - ptr as usize },
+        24usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(reassembly_table),
+            "::",
+            stringify!(persistent_key_func)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).free_temporary_key_func) as usize - ptr as usize },
+        32usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(reassembly_table),
+            "::",
+            stringify!(free_temporary_key_func)
+        )
+    );
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct reassembly_table_functions {
+    pub hash_func: GHashFunc,
+    pub equal_func: GEqualFunc,
+    pub temporary_key_func: fragment_temporary_key,
+    pub persistent_key_func: fragment_persistent_key,
+    pub free_temporary_key_func: GDestroyNotify,
+    pub free_persistent_key_func: GDestroyNotify,
+}
+#[test]
+fn bindgen_test_layout_reassembly_table_functions() {
+    const UNINIT: ::std::mem::MaybeUninit<reassembly_table_functions> =
+        ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<reassembly_table_functions>(),
+        48usize,
+        concat!("Size of: ", stringify!(reassembly_table_functions))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<reassembly_table_functions>(),
+        8usize,
+        concat!("Alignment of ", stringify!(reassembly_table_functions))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hash_func) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(reassembly_table_functions),
+            "::",
+            stringify!(hash_func)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).equal_func) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(reassembly_table_functions),
+            "::",
+            stringify!(equal_func)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).temporary_key_func) as usize - ptr as usize },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(reassembly_table_functions),
+            "::",
+            stringify!(temporary_key_func)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).persistent_key_func) as usize - ptr as usize },
+        24usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(reassembly_table_functions),
+            "::",
+            stringify!(persistent_key_func)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).free_temporary_key_func) as usize - ptr as usize },
+        32usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(reassembly_table_functions),
+            "::",
+            stringify!(free_temporary_key_func)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).free_persistent_key_func) as usize - ptr as usize },
+        40usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(reassembly_table_functions),
+            "::",
+            stringify!(free_persistent_key_func)
+        )
+    );
+}
+extern "C" {
+    pub static addresses_reassembly_table_functions: reassembly_table_functions;
+}
+extern "C" {
+    pub static addresses_ports_reassembly_table_functions: reassembly_table_functions;
+}
+extern "C" {
+    pub fn reassembly_table_register(
+        table: *mut reassembly_table,
+        funcs: *const reassembly_table_functions,
+    );
+}
+extern "C" {
+    pub fn reassembly_table_init(
+        table: *mut reassembly_table,
+        funcs: *const reassembly_table_functions,
+    );
+}
+extern "C" {
+    pub fn reassembly_table_destroy(table: *mut reassembly_table);
+}
+extern "C" {
+    pub fn fragment_add(
+        table: *mut reassembly_table,
+        tvb: *mut tvbuff_t,
+        offset: ::std::os::raw::c_int,
+        pinfo: *const packet_info,
+        id: u32,
+        data: *const ::std::os::raw::c_void,
+        frag_offset: u32,
+        frag_data_len: u32,
+        more_frags: bool,
+    ) -> *mut fragment_head;
+}
+extern "C" {
+    pub fn fragment_add_multiple_ok(
+        table: *mut reassembly_table,
+        tvb: *mut tvbuff_t,
+        offset: ::std::os::raw::c_int,
+        pinfo: *const packet_info,
+        id: u32,
+        data: *const ::std::os::raw::c_void,
+        frag_offset: u32,
+        frag_data_len: u32,
+        more_frags: bool,
+    ) -> *mut fragment_head;
+}
+extern "C" {
+    pub fn fragment_add_out_of_order(
+        table: *mut reassembly_table,
+        tvb: *mut tvbuff_t,
+        offset: ::std::os::raw::c_int,
+        pinfo: *const packet_info,
+        id: u32,
+        data: *const ::std::os::raw::c_void,
+        frag_offset: u32,
+        frag_data_len: u32,
+        more_frags: bool,
+        frag_frame: u32,
+    ) -> *mut fragment_head;
+}
+extern "C" {
+    pub fn fragment_add_check(
+        table: *mut reassembly_table,
+        tvb: *mut tvbuff_t,
+        offset: ::std::os::raw::c_int,
+        pinfo: *const packet_info,
+        id: u32,
+        data: *const ::std::os::raw::c_void,
+        frag_offset: u32,
+        frag_data_len: u32,
+        more_frags: bool,
+    ) -> *mut fragment_head;
+}
+extern "C" {
+    pub fn fragment_add_check_with_fallback(
+        table: *mut reassembly_table,
+        tvb: *mut tvbuff_t,
+        offset: ::std::os::raw::c_int,
+        pinfo: *const packet_info,
+        id: u32,
+        data: *const ::std::os::raw::c_void,
+        frag_offset: u32,
+        frag_data_len: u32,
+        more_frags: bool,
+        fallback_frame: u32,
+    ) -> *mut fragment_head;
+}
+extern "C" {
+    pub fn fragment_add_seq(
+        table: *mut reassembly_table,
+        tvb: *mut tvbuff_t,
+        offset: ::std::os::raw::c_int,
+        pinfo: *const packet_info,
+        id: u32,
+        data: *const ::std::os::raw::c_void,
+        frag_number: u32,
+        frag_data_len: u32,
+        more_frags: bool,
+        flags: u32,
+    ) -> *mut fragment_head;
+}
+extern "C" {
+    pub fn fragment_add_seq_check(
+        table: *mut reassembly_table,
+        tvb: *mut tvbuff_t,
+        offset: ::std::os::raw::c_int,
+        pinfo: *const packet_info,
+        id: u32,
+        data: *const ::std::os::raw::c_void,
+        frag_number: u32,
+        frag_data_len: u32,
+        more_frags: bool,
+    ) -> *mut fragment_head;
+}
+extern "C" {
+    pub fn fragment_add_seq_802_11(
+        table: *mut reassembly_table,
+        tvb: *mut tvbuff_t,
+        offset: ::std::os::raw::c_int,
+        pinfo: *const packet_info,
+        id: u32,
+        data: *const ::std::os::raw::c_void,
+        frag_number: u32,
+        frag_data_len: u32,
+        more_frags: bool,
+    ) -> *mut fragment_head;
+}
+extern "C" {
+    pub fn fragment_add_seq_next(
+        table: *mut reassembly_table,
+        tvb: *mut tvbuff_t,
+        offset: ::std::os::raw::c_int,
+        pinfo: *const packet_info,
+        id: u32,
+        data: *const ::std::os::raw::c_void,
+        frag_data_len: u32,
+        more_frags: bool,
+    ) -> *mut fragment_head;
+}
+extern "C" {
+    pub fn fragment_add_seq_single(
+        table: *mut reassembly_table,
+        tvb: *mut tvbuff_t,
+        offset: ::std::os::raw::c_int,
+        pinfo: *const packet_info,
+        id: u32,
+        data: *const ::std::os::raw::c_void,
+        frag_data_len: u32,
+        first: bool,
+        last: bool,
+        max_frags: u32,
+    ) -> *mut fragment_head;
+}
+extern "C" {
+    pub fn fragment_add_seq_single_aging(
+        table: *mut reassembly_table,
+        tvb: *mut tvbuff_t,
+        offset: ::std::os::raw::c_int,
+        pinfo: *const packet_info,
+        id: u32,
+        data: *const ::std::os::raw::c_void,
+        frag_data_len: u32,
+        first: bool,
+        last: bool,
+        max_frags: u32,
+        max_age: u32,
+    ) -> *mut fragment_head;
+}
+extern "C" {
+    pub fn fragment_start_seq_check(
+        table: *mut reassembly_table,
+        pinfo: *const packet_info,
+        id: u32,
+        data: *const ::std::os::raw::c_void,
+        tot_len: u32,
+    );
+}
+extern "C" {
+    pub fn fragment_end_seq_next(
+        table: *mut reassembly_table,
+        pinfo: *const packet_info,
+        id: u32,
+        data: *const ::std::os::raw::c_void,
+    ) -> *mut fragment_head;
+}
+extern "C" {
+    pub fn fragment_add_seq_offset(
+        table: *mut reassembly_table,
+        pinfo: *const packet_info,
+        id: u32,
+        data: *const ::std::os::raw::c_void,
+        fragment_offset: u32,
+    );
+}
+extern "C" {
+    pub fn fragment_set_tot_len(
+        table: *mut reassembly_table,
+        pinfo: *const packet_info,
+        id: u32,
+        data: *const ::std::os::raw::c_void,
+        tot_len: u32,
+    );
+}
+extern "C" {
+    pub fn fragment_reset_tot_len(
+        table: *mut reassembly_table,
+        pinfo: *const packet_info,
+        id: u32,
+        data: *const ::std::os::raw::c_void,
+        tot_len: u32,
+    );
+}
+extern "C" {
+    pub fn fragment_truncate(
+        table: *mut reassembly_table,
+        pinfo: *const packet_info,
+        id: u32,
+        data: *const ::std::os::raw::c_void,
+        tot_len: u32,
+    );
+}
+extern "C" {
+    pub fn fragment_get_tot_len(
+        table: *mut reassembly_table,
+        pinfo: *const packet_info,
+        id: u32,
+        data: *const ::std::os::raw::c_void,
+    ) -> u32;
+}
+extern "C" {
+    pub fn fragment_set_partial_reassembly(
+        table: *mut reassembly_table,
+        pinfo: *const packet_info,
+        id: u32,
+        data: *const ::std::os::raw::c_void,
+    );
+}
+extern "C" {
+    pub fn fragment_get(
+        table: *mut reassembly_table,
+        pinfo: *const packet_info,
+        id: u32,
+        data: *const ::std::os::raw::c_void,
+    ) -> *mut fragment_head;
+}
+extern "C" {
+    pub fn fragment_get_reassembled_id(
+        table: *mut reassembly_table,
+        pinfo: *const packet_info,
+        id: u32,
+    ) -> *mut fragment_head;
+}
+extern "C" {
+    pub fn fragment_delete(
+        table: *mut reassembly_table,
+        pinfo: *const packet_info,
+        id: u32,
+        data: *const ::std::os::raw::c_void,
+    ) -> *mut tvbuff_t;
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct _fragment_items {
+    pub ett_fragment: *mut ::std::os::raw::c_int,
+    pub ett_fragments: *mut ::std::os::raw::c_int,
+    pub hf_fragments: *mut ::std::os::raw::c_int,
+    pub hf_fragment: *mut ::std::os::raw::c_int,
+    pub hf_fragment_overlap: *mut ::std::os::raw::c_int,
+    pub hf_fragment_overlap_conflict: *mut ::std::os::raw::c_int,
+    pub hf_fragment_multiple_tails: *mut ::std::os::raw::c_int,
+    pub hf_fragment_too_long_fragment: *mut ::std::os::raw::c_int,
+    pub hf_fragment_error: *mut ::std::os::raw::c_int,
+    pub hf_fragment_count: *mut ::std::os::raw::c_int,
+    pub hf_reassembled_in: *mut ::std::os::raw::c_int,
+    pub hf_reassembled_length: *mut ::std::os::raw::c_int,
+    pub hf_reassembled_data: *mut ::std::os::raw::c_int,
+    pub tag: *const ::std::os::raw::c_char,
+}
+#[test]
+fn bindgen_test_layout__fragment_items() {
+    const UNINIT: ::std::mem::MaybeUninit<_fragment_items> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<_fragment_items>(),
+        112usize,
+        concat!("Size of: ", stringify!(_fragment_items))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<_fragment_items>(),
+        8usize,
+        concat!("Alignment of ", stringify!(_fragment_items))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).ett_fragment) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_items),
+            "::",
+            stringify!(ett_fragment)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).ett_fragments) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_items),
+            "::",
+            stringify!(ett_fragments)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hf_fragments) as usize - ptr as usize },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_items),
+            "::",
+            stringify!(hf_fragments)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hf_fragment) as usize - ptr as usize },
+        24usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_items),
+            "::",
+            stringify!(hf_fragment)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hf_fragment_overlap) as usize - ptr as usize },
+        32usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_items),
+            "::",
+            stringify!(hf_fragment_overlap)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).hf_fragment_overlap_conflict) as usize - ptr as usize
+        },
+        40usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_items),
+            "::",
+            stringify!(hf_fragment_overlap_conflict)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hf_fragment_multiple_tails) as usize - ptr as usize },
+        48usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_items),
+            "::",
+            stringify!(hf_fragment_multiple_tails)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).hf_fragment_too_long_fragment) as usize - ptr as usize
+        },
+        56usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_items),
+            "::",
+            stringify!(hf_fragment_too_long_fragment)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hf_fragment_error) as usize - ptr as usize },
+        64usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_items),
+            "::",
+            stringify!(hf_fragment_error)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hf_fragment_count) as usize - ptr as usize },
+        72usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_items),
+            "::",
+            stringify!(hf_fragment_count)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hf_reassembled_in) as usize - ptr as usize },
+        80usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_items),
+            "::",
+            stringify!(hf_reassembled_in)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hf_reassembled_length) as usize - ptr as usize },
+        88usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_items),
+            "::",
+            stringify!(hf_reassembled_length)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hf_reassembled_data) as usize - ptr as usize },
+        96usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_items),
+            "::",
+            stringify!(hf_reassembled_data)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).tag) as usize - ptr as usize },
+        104usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_fragment_items),
+            "::",
+            stringify!(tag)
+        )
+    );
+}
+pub type fragment_items = _fragment_items;
+extern "C" {
+    pub fn process_reassembled_data(
+        tvb: *mut tvbuff_t,
+        offset: ::std::os::raw::c_int,
+        pinfo: *mut packet_info,
+        name: *const ::std::os::raw::c_char,
+        fd_head: *mut fragment_head,
+        fit: *const fragment_items,
+        update_col_infop: *mut bool,
+        tree: *mut proto_tree,
+    ) -> *mut tvbuff_t;
+}
+extern "C" {
+    pub fn show_fragment_tree(
+        ipfd_head: *mut fragment_head,
+        fit: *const fragment_items,
+        tree: *mut proto_tree,
+        pinfo: *mut packet_info,
+        tvb: *mut tvbuff_t,
+        fi: *mut *mut proto_item,
+    ) -> bool;
+}
+extern "C" {
+    pub fn show_fragment_seq_tree(
+        ipfd_head: *mut fragment_head,
+        fit: *const fragment_items,
+        tree: *mut proto_tree,
+        pinfo: *mut packet_info,
+        tvb: *mut tvbuff_t,
+        fi: *mut *mut proto_item,
+    ) -> bool;
+}
+extern "C" {
+    pub fn reassembly_tables_init();
+}
+extern "C" {
+    pub fn reassembly_table_cleanup();
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct streaming_reassembly_info_t {
+    _unused: [u8; 0],
+}
+extern "C" {
+    pub fn streaming_reassembly_info_new() -> *mut streaming_reassembly_info_t;
+}
+extern "C" {
+    pub fn reassemble_streaming_data_and_call_subdissector(
+        tvb: *mut tvbuff_t,
+        pinfo: *mut packet_info,
+        offset: ::std::os::raw::c_uint,
+        length: ::std::os::raw::c_int,
+        segment_tree: *mut proto_tree,
+        reassembled_tree: *mut proto_tree,
+        streaming_reassembly_table: reassembly_table,
+        reassembly_info: *mut streaming_reassembly_info_t,
+        cur_frame_num: u64,
+        subdissector_handle: dissector_handle_t,
+        subdissector_tree: *mut proto_tree,
+        subdissector_data: *mut ::std::os::raw::c_void,
+        label: *const ::std::os::raw::c_char,
+        frag_hf_items: *const fragment_items,
+        hf_segment_data: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn additional_bytes_expected_to_complete_reassembly(
+        reassembly_info: *mut streaming_reassembly_info_t,
+    ) -> ::std::os::raw::c_int;
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
