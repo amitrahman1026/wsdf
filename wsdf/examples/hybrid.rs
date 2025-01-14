@@ -10,8 +10,11 @@ pub struct Protocol {
     filter: String,
     // Static data for this protocol
     proto_handle: c_int,
+
+    ett_defs: Vec<Ett>,
     // Holds the collapse state of the subtree
-    ett_handles: Vec<c_int>,
+    ett_handles: HashMap<String, EttHandle>,
+
     // The actual dissector implementation
     pub(crate) dissector_fn: Dissector,
 
@@ -35,7 +38,7 @@ impl Protocol {
 
         // Convert strings for value_string if present
         let values_ptr = if let Some(strings) = &field.strings {
-            let values: Vec<epan_sys::_value_string> = strings
+            let mut values: Vec<epan_sys::_value_string> = strings
                 .iter()
                 .map(|(val, str)| epan_sys::_value_string {
                     value: *val,
@@ -43,6 +46,12 @@ impl Protocol {
                 })
                 .collect();
 
+            // The last entry in the array must have a NULL 'strptr' value, to
+            // indicate the end of the array
+            values.push(epan_sys::_value_string {
+                value: 0,
+                strptr: std::ptr::null(),
+            });
             Box::into_raw(values.into_boxed_slice()) as *const epan_sys::_value_string
         // TODO: Check memory
         } else {
@@ -85,26 +94,35 @@ impl Protocol {
             Err(RegistrationError::RegistrationFailed)
         }
     }
+    fn get_ett_handle(&self, id: &str) -> c_int {
+        // self.ett_handles.get(idx as usize).expect("ETT handle index out of bounds, use set_num_ett during protocol creation to set the number of ETT fields").clone()
+        self.ett_handles
+            .get(id)
+            .expect(&format!("ETT '{}' not registered", id))
+            .handle
+    }
     // This should be called by the Protocol.register routine unless you know what you're doing
-    // TODO: possible refactor is to let users registers ETT with string identifiers
-    // and we encapsulate the num_ett parameter internally complete. e.g. a map of ett types
-    unsafe fn register_ett_array(&mut self, num_ett: usize) {
+    unsafe fn register_ett(&mut self) {
         // Initialize ett handles with -1
-        self.ett_handles.resize(num_ett, -1);
+        let mut ett_handles = vec![-1; self.ett_defs.len()];
 
-        // Create array of pointers to ett handles for registration
-        let ett_ptrs: Vec<*mut c_int> = self
-            .ett_handles
-            .iter_mut()
-            .map(|h| h as *mut c_int)
-            .collect();
+        // Create array of pointers to ett handles
+        let ett_ptrs: Vec<*mut c_int> = ett_handles.iter_mut().map(|h| h as *mut c_int).collect();
 
         // Register the ETT array with Wireshark
-        epan_sys::proto_register_subtree_array(ett_ptrs.as_ptr(), num_ett as c_int);
+        epan_sys::proto_register_subtree_array(ett_ptrs.as_ptr(), ett_handles.len() as c_int);
+
+        // Store handles mapped to their IDs
+        for (i, ett) in self.ett_defs.iter().enumerate() {
+            self.ett_handles.insert(
+                ett.id.clone(),
+                EttHandle {
+                    handle: ett_handles[i],
+                },
+            );
+        }
     }
-    fn get_ett_handle(&self, idx: c_int) -> c_int {
-        self.ett_handles.get(idx as usize).expect("ETT handle index out of bounds, use set_num_ett during protocol creation to set the number of ETT fields").clone()
-    }
+
     // Get the handle to the protocol's ETT
     fn get_proto_handle(&self) -> c_int {
         self.proto_handle
@@ -189,9 +207,7 @@ impl Protocol {
                     .expect("Failed to register field");
             }
             // Registering ETT is basically saying how many types of trees you have
-            // We need to convert this into something more dynamic so that maybe it's easier
-            // for users to add their custom types with some tree_type_id lookup, then
-            self.register_ett_array(1);
+            self.register_ett();
 
             // Registering Expert Info and just retaining the expert field handles
             if !expert_infos_to_register.is_empty() {
@@ -285,6 +301,18 @@ pub struct FieldHandle {
     handle: c_int,
 }
 
+#[derive(Clone)]
+pub struct Ett {
+    id: String,
+    _name: String,
+}
+
+pub struct EttHandle {
+    handle: c_int,
+}
+
+const ROOT_ETT_ID: &str = "_root";
+
 pub struct ExpertFieldHandle {
     ei: c_int,
     hf: c_int,
@@ -304,6 +332,7 @@ pub struct ProtocolBuilder {
     filter: String,
     dissector_fn: Option<Dissector>,
     fields: Vec<Field>,
+    ett: Vec<Ett>,
     expert_infos: Vec<ExpertFieldInfo>,
     match_definitions: Vec<DissectorDecodeFrom>,
 }
@@ -320,6 +349,7 @@ impl ProtocolBuilder {
             filter: filter.into(),
             dissector_fn: None,
             fields: Vec::new(),
+            ett: Vec::new(),
             expert_infos: Vec::new(),
             match_definitions: Vec::new(),
         }
@@ -332,6 +362,14 @@ impl ProtocolBuilder {
 
     pub fn field(mut self, field: Field) -> Self {
         self.fields.push(field);
+        self
+    }
+
+    pub fn ett(mut self, id: impl Into<String>, name: impl Into<String>) -> Self {
+        self.ett.push(Ett {
+            id: id.into(),
+            _name: name.into(),
+        });
         self
     }
 
@@ -366,14 +404,22 @@ impl ProtocolBuilder {
                 to_c_str(&self.abbrev),
                 to_c_str(&self.filter),
             );
-            // TODO: check if we need to register expert module here
             debug_assert!(proto_handle != -1);
+
+            // Ett def list should include root ETT type
+            let mut ett_defs = vec![Ett {
+                id: ROOT_ETT_ID.to_string(),
+                _name: format!("{} Protocol Tree", self.name),
+            }];
+            ett_defs.extend(self.ett);
+
             Ok(Protocol {
                 _name: self.name,
                 abbrev: self.abbrev,
                 filter: self.filter,
                 proto_handle,
-                ett_handles: vec![-1; 1], // Consider improving ergonomics of registering types of trees
+                ett_defs,
+                ett_handles: HashMap::new(),
                 dissector_fn: dissector,
                 field_defs: self.fields,       // Store the field definitions
                 field_handles: HashMap::new(), // Will be populated during registration
@@ -390,11 +436,11 @@ impl ProtocolBuilder {
 // WIP: Data structures needed to support the object oriented API
 pub struct Tvb {
     ptr: *mut epan_sys::tvbuff,
-    offset: i32,
+    _offset: i32,
 }
 impl Tvb {
     pub fn new(ptr: *mut epan_sys::tvbuff) -> Self {
-        Self { ptr, offset: 0 }
+        Self { ptr, _offset: 0 }
     }
     pub unsafe fn get_ptr(&self, offset: i32, length: i32) -> *const u8 {
         epan_sys::tvb_get_ptr(self.ptr, offset, length)
@@ -454,7 +500,7 @@ impl PacketInfo {
     pub fn new(ptr: *mut epan_sys::_packet_info) -> Self {
         Self { ptr }
     }
-    // This raw pointer is managed by the block allocator of
+    // This raw pointer is managed by the block allocator of wmem
     pub unsafe fn alloc_raw_string(&self, s: &str) -> *const i8 {
         let c_str = std::ffi::CString::new(s).unwrap();
         unsafe {
@@ -516,7 +562,7 @@ impl<'a> Tree<'a> {
             epan_sys::ENC_NA,
         );
         // The actual subtree for display
-        let current = epan_sys::proto_item_add_subtree(item, protocol.get_ett_handle(0));
+        let current = epan_sys::proto_item_add_subtree(item, protocol.get_ett_handle(ROOT_ETT_ID));
 
         Self {
             protocol,
@@ -854,6 +900,7 @@ impl FieldDisplay {
     }
 }
 
+#[allow(non_camel_case_types)]
 #[derive(Copy, Clone)]
 pub enum Encoding {
     BigEndian,
