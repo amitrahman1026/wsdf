@@ -434,28 +434,43 @@ impl ProtocolBuilder {
 }
 
 // WIP: Data structures needed to support the object oriented API
+#[derive(Clone, Copy)]
 pub struct Tvb {
     ptr: *mut epan_sys::tvbuff,
-    _offset: i32,
+    start: i32,
+    offset: i32,
 }
 impl Tvb {
     pub fn new(ptr: *mut epan_sys::tvbuff) -> Self {
-        Self { ptr, _offset: 0 }
+        Self {
+            ptr,
+            start: 0,
+            offset: 0,
+        }
     }
     pub unsafe fn get_ptr(&self, offset: i32, length: i32) -> *const u8 {
         epan_sys::tvb_get_ptr(self.ptr, offset, length)
     }
-    pub fn get_uint8(&self, offset: i32) -> u8 {
-        unsafe { epan_sys::tvb_get_uint8(self.ptr, offset) }
+
+    // The get_DATA() type functions should do the book keeping required for the underlying managed buffer
+
+    pub fn get_uint8(&mut self, _offset: i32) -> u8 {
+        unsafe {
+            let ret = epan_sys::tvb_get_uint8(self.ptr, self.offset);
+            self.offset += 1;
+            ret
+        }
     }
 
-    pub fn get_uint16(&self, offset: i32, encoding: Encoding) -> u16 {
+    pub fn get_uint16(&mut self, _offset: i32, encoding: Encoding) -> u16 {
         unsafe {
-            match encoding {
-                Encoding::BigEndian => epan_sys::tvb_get_ntohs(self.ptr, offset),
+            let ret = match encoding {
+                Encoding::BigEndian => epan_sys::tvb_get_ntohs(self.ptr, self.offset),
                 // everything that is not Big Endian (enc as 0) is Litte endian in wireshark
-                _ => epan_sys::tvb_get_letohs(self.ptr, offset),
-            }
+                _ => epan_sys::tvb_get_letohs(self.ptr, self.offset),
+            };
+            self.offset += 2;
+            ret
         }
     }
     pub unsafe fn new_child_real_data(
@@ -587,15 +602,21 @@ impl<'a> Tree<'a> {
                 self.current_node,
                 self.protocol.get_field_handle(field_id)?.handle,
                 self.tvb.ptr,
-                self.offset,
+                self.tvb.offset,
                 length,
                 encoding.to_u32(),
             );
 
-            self.offset += length;
+            let item_tvb = Tvb {
+                ptr: self.tvb.ptr,
+                start: self.tvb.offset,
+                offset: self.tvb.offset,
+            }; // the item's tvb should be starting at the offset
+
+            self.tvb.offset += length;
 
             if !item.is_null() {
-                Some(TreeItem::new(item, self.pinfo))
+                Some(TreeItem::new(item, self.pinfo, item_tvb))
             } else {
                 None
             }
@@ -678,11 +699,12 @@ impl<'a> Tree<'a> {
 pub struct TreeItem {
     ptr: *mut epan_sys::proto_item,
     pinfo: PacketInfo,
+    tvb: Tvb,
 }
 
 impl TreeItem {
-    pub(crate) fn new(ptr: *mut epan_sys::proto_item, pinfo: PacketInfo) -> Self {
-        Self { ptr, pinfo }
+    pub(crate) fn new(ptr: *mut epan_sys::proto_item, pinfo: PacketInfo, tvb: Tvb) -> Self {
+        Self { ptr, pinfo, tvb }
     }
     pub fn set_text(&mut self, text: &str) {
         unsafe {
@@ -1323,8 +1345,10 @@ pub fn build_example_protocol() -> Result<Protocol, RegistrationError> {
             tree.pinfo.set_column_text(Column::Protocol, "WSDF Example");
 
             // First field demonstrates basic field addition and expert info
-            let mut field1_item = tree.add_item("field1", 1, Encoding::BigEndian).unwrap();
-            tree.add_expert_info(&mut field1_item, "expert_condition1", None);
+            let mut field1_item = header_tree
+                .add_item("field1", 1, Encoding::BigEndian)
+                .unwrap();
+            header_tree.add_expert_info(&mut field1_item, "expert_condition1", None);
 
             // Second field shows text manipulation
             let mut field2_item = tree.add_item("field2", 2, Encoding::BigEndian).unwrap();
@@ -1336,8 +1360,18 @@ pub fn build_example_protocol() -> Result<Protocol, RegistrationError> {
             );
 
             // Compression flag and original size
-            let mut flag_item = tree.add_item("comp_flag", 1, Encoding::BigEndian).unwrap();
-            let flag_value = tree.tvb.get_uint8(tree.offset - 1);
+            let mut flag_item: TreeItem = payload_tree
+                .add_item("comp_flag", 1, Encoding::BigEndian)
+                .unwrap();
+            let flag_value = flag_item.tvb.get_uint8(payload_tree.tvb.start);
+
+            let mut size_item = payload_tree
+                .add_item("orig_size", 2, Encoding::BigEndian)
+                .unwrap();
+            let orig_size = size_item
+                .tvb
+                .get_uint16(payload_tree.tvb.offset, Encoding::BigEndian)
+                as u32;
 
             let orig_size = tree.tvb.get_uint16(tree.offset, Encoding::BigEndian) as u32;
             let mut size_item = tree.add_item("orig_size", 2, Encoding::BigEndian).unwrap();
@@ -1346,8 +1380,9 @@ pub fn build_example_protocol() -> Result<Protocol, RegistrationError> {
             if flag_value & 0x80 != 0 {
                 // Check MSB for compression flag
                 flag_item.append_text(" (Compressed data)");
-                size_item
-                    .append_text(format!(" ({} bytes after decompression)", orig_size).as_str());
+                size_item.append_text(
+                    format!(" ({} bytes after decompression)", orig_size * 2).as_str(),
+                );
 
                 // Our example "decompression" function simply duplicates each byte
                 // In real protocols this would be actual decompression
