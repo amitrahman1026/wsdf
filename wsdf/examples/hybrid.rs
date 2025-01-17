@@ -555,8 +555,7 @@ pub struct Tree<'a> {
     pinfo: PacketInfo,
     tvb: Tvb,
     current_node: *mut epan_sys::proto_node,
-    _parent_node: *mut epan_sys::proto_node,
-    offset: i32,
+    current_item: *mut epan_sys::proto_item,
 }
 
 impl<'a> Tree<'a> {
@@ -584,13 +583,46 @@ impl<'a> Tree<'a> {
             pinfo: PacketInfo::new(pinfo),
             tvb: Tvb::new(tvb),
             current_node: current,
-            _parent_node: parent,
-            offset,
+            current_item: item,
         }
     }
     pub fn get_reported_length(&self) -> i32 {
         unsafe { epan_sys::tvb_reported_length(self.tvb.ptr) as i32 }
     }
+    pub fn add_subtree(&mut self, field_id: &str, ett_id: &str) -> Option<Tree<'a>> {
+        unsafe {
+            let item = epan_sys::proto_tree_add_item(
+                self.current_node,
+                self.protocol.get_field_handle(field_id)?.handle,
+                self.tvb.ptr,
+                self.tvb.offset, // New subtrees should be added at the current offset of the parent subtree's tvb
+                0,               // Length will be set when sub tree is ended
+                epan_sys::ENC_NA,
+            );
+
+            let subtree =
+                epan_sys::proto_item_add_subtree(item, self.protocol.get_ett_handle(ett_id));
+
+            Some(Tree {
+                protocol: self.protocol,
+                pinfo: self.pinfo,
+                tvb: self.tvb,
+                current_node: subtree,
+                current_item: item,
+            })
+        }
+    }
+
+    pub fn end_subtree(&mut self, subtree: &Tree) {
+        let length = subtree.tvb.offset - subtree.tvb.start;
+        unsafe {
+            epan_sys::proto_item_set_len(subtree.current_item, length);
+        }
+        self.tvb.offset = subtree.tvb.offset;
+    }
+
+    // Adds an item to the start offset of the tree, and increment the current offset by length
+    // Returns a TreeItem that offers a view on the "section" the item looks at
     pub fn add_item(
         &mut self,
         field_id: &str,
@@ -662,8 +694,7 @@ impl<'a> Tree<'a> {
             pinfo: self.pinfo,
             tvb,
             current_node: self.current_node,
-            _parent_node: self._parent_node,
-            offset: 0, // Reset offset for new buffer
+            current_item: self.current_item,
         }
     }
     // Provide users a way for users to be able to pass in a closure to transform data
@@ -674,8 +705,8 @@ impl<'a> Tree<'a> {
         transform_fn: impl FnOnce(&[u8], &mut [u8]) -> Result<(), Box<dyn std::error::Error>>,
     ) -> Option<Tree<'a>> {
         unsafe {
-            let src_ptr = self.tvb.get_ptr(self.offset, -1);
-            let src_len = self.tvb.remaining_length(self.offset) as usize;
+            let src_ptr = self.tvb.get_ptr(self.tvb.offset, -1);
+            let src_len = self.tvb.remaining_length(self.tvb.offset) as usize;
             let src_data = std::slice::from_raw_parts(src_ptr, src_len);
 
             // TODO: Check memory here as well
@@ -1344,6 +1375,10 @@ pub fn build_example_protocol() -> Result<Protocol, RegistrationError> {
             // Set protocol columns
             tree.pinfo.set_column_text(Column::Protocol, "WSDF Example");
 
+            // Creating a subtree to represent the header of the protocol
+            let mut header_tree = tree
+                .add_subtree("header_field", "header")
+                .expect("Unable to create header tree! Have you registered field_id and ett_id?");
             // First field demonstrates basic field addition and expert info
             let mut field1_item = header_tree
                 .add_item("field1", 1, Encoding::BigEndian)
@@ -1351,12 +1386,20 @@ pub fn build_example_protocol() -> Result<Protocol, RegistrationError> {
             header_tree.add_expert_info(&mut field1_item, "expert_condition1", None);
 
             // Second field shows text manipulation
-            let mut field2_item = tree.add_item("field2", 2, Encoding::BigEndian).unwrap();
-            field2_item.append_text(" (demonstrates text appending)");
-            tree.add_expert_info(
+            let mut field2_item = header_tree
+                .add_item("field2", 2, Encoding::BigEndian)
+                .unwrap();
+            header_tree.add_expert_info(
                 &mut field2_item,
                 "expert_condition2",
                 Some("Custom expert info with dynamic text!"),
+            );
+
+            tree.end_subtree(&header_tree);
+
+            // Creating a subtree to represent the payload of the protocol
+            let mut payload_tree = tree.add_subtree("payload_field", "payload").expect(
+                "Unable to create payload tree! Have you registered the field_id and ett_id?",
             );
 
             // Compression flag and original size
@@ -1373,8 +1416,7 @@ pub fn build_example_protocol() -> Result<Protocol, RegistrationError> {
                 .get_uint16(payload_tree.tvb.offset, Encoding::BigEndian)
                 as u32;
 
-            let orig_size = tree.tvb.get_uint16(tree.offset, Encoding::BigEndian) as u32;
-            let mut size_item = tree.add_item("orig_size", 2, Encoding::BigEndian).unwrap();
+            tree.end_subtree(&payload_tree);
 
             // Example transformation based on flag
             if flag_value & 0x80 != 0 {
@@ -1386,17 +1428,19 @@ pub fn build_example_protocol() -> Result<Protocol, RegistrationError> {
 
                 // Our example "decompression" function simply duplicates each byte
                 // In real protocols this would be actual decompression
-                if let Some(mut decompressed_tree) = tree.transform_data(orig_size, |src, dst| {
-                    let mut dst_idx = 0;
-                    for &byte in src.iter() {
-                        if dst_idx + 1 < dst.len() {
-                            dst[dst_idx] = byte;
-                            dst[dst_idx + 1] = byte;
-                            dst_idx += 2;
+                if let Some(mut decompressed_tree) =
+                    payload_tree.transform_data(orig_size, |src, dst| {
+                        let mut dst_idx = 0;
+                        for &byte in src.iter() {
+                            if dst_idx + 1 < dst.len() {
+                                dst[dst_idx] = byte;
+                                dst[dst_idx + 1] = byte;
+                                dst_idx += 2;
+                            }
                         }
-                    }
-                    Ok(())
-                }) {
+                        Ok(())
+                    })
+                {
                     // Transformed decompressed data can be added as a new field
                     let mut payload_item = decompressed_tree
                         .add_item("decompressed_data", orig_size as i32, Encoding::NA)
@@ -1430,6 +1474,20 @@ pub fn build_example_protocol() -> Result<Protocol, RegistrationError> {
 
             tree.get_reported_length()
         }))
+        .ett("header", "Header Fields")
+        .ett("payload", "Payload Fields")
+        .field(
+            FieldBuilder::new("header_field", "Header Field", "wsdf.header_field")
+                .field_type(FieldType::None)
+                .display(FieldDisplay::None)
+                .build()?,
+        )
+        .field(
+            FieldBuilder::new("payload_field", "Payload Field", "wsdf.payload_field")
+                .field_type(FieldType::None)
+                .display(FieldDisplay::None)
+                .build()?,
+        )
         .field(
             FieldBuilder::new("field1", "First Field", "wsdf.field1")
                 .field_type(FieldType::Uint8)
