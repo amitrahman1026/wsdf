@@ -22,11 +22,8 @@ pub struct Protocol {
     // All registered fields for this protocol
     field_handles: HashMap<String, FieldHandle>,
 
-    expert_info_defs: Vec<ExpertFieldInfo>,
-    // Lookup for expert field handles
-    expert_fields_handles: HashMap<String, ExpertFieldHandle>,
-    // Expert field modules
-    expert_module: *mut epan_sys::expert_module_t,
+    // Encapsulates expert fields management under Expert Module
+    expert_module: ExpertModule,
 
     // Pending match conditions for this protocol that have not yet been registered
     match_definitions: Option<Vec<DissectorDecodeFrom>>,
@@ -179,7 +176,7 @@ impl Protocol {
         epan_sys::expert_register_field_array(expert_module, ei_ptr, 1);
 
         if (*(*ei_ptr).ids).ei != -1 && (*(*ei_ptr).ids).hf != -1 {
-            self.expert_fields_handles.insert(
+            self.expert_module.expert_fields_handles.insert(
                 info.id.clone(),
                 ExpertFieldHandle {
                     ei: (*(*ei_ptr).ids).ei,
@@ -194,12 +191,12 @@ impl Protocol {
         }
     }
     fn get_expert_field(&self, id: &str) -> Option<&ExpertFieldHandle> {
-        self.expert_fields_handles.get(id)
+        self.expert_module.expert_fields_handles.get(id)
     }
     // Routine to be called to register all header fields, ETT types, expert fields
     fn register(&mut self) {
         let fields_to_register = self.field_defs.clone();
-        let expert_infos_to_register = self.expert_info_defs.clone();
+        let expert_infos_to_register = self.expert_module.expert_info_defs.clone();
 
         unsafe {
             for field in fields_to_register {
@@ -212,7 +209,7 @@ impl Protocol {
             // Registering Expert Info and just retaining the expert field handles
             if !expert_infos_to_register.is_empty() {
                 let expert_module = epan_sys::expert_register_protocol(self.proto_handle);
-                self.expert_module = expert_module;
+                self.expert_module.ptr = expert_module;
                 for expert_info in expert_infos_to_register {
                     self.register_expert_info(expert_module, &expert_info)
                         .expect("Failed to register expert info");
@@ -312,6 +309,14 @@ pub struct EttHandle {
 }
 
 const ROOT_ETT_ID: &str = "_root";
+
+pub struct ExpertModule {
+    expert_info_defs: Vec<ExpertFieldInfo>,
+    // Lookup for expert field handles
+    expert_fields_handles: HashMap<String, ExpertFieldHandle>,
+    // Innter ptr to expert field modules
+    ptr: *mut epan_sys::expert_module_t,
+}
 
 pub struct ExpertFieldHandle {
     ei: c_int,
@@ -423,10 +428,11 @@ impl ProtocolBuilder {
                 dissector_fn: dissector,
                 field_defs: self.fields,       // Store the field definitions
                 field_handles: HashMap::new(), // Will be populated during registration
-                // TODO: encapsulate expert fields under Expert Module
-                expert_info_defs: self.expert_infos,
-                expert_fields_handles: HashMap::new(),
-                expert_module: std::ptr::null_mut(),
+                expert_module: ExpertModule {
+                    expert_info_defs: self.expert_infos,
+                    expert_fields_handles: HashMap::new(),
+                    ptr: std::ptr::null_mut(), // Will be populated during registration
+                },
                 match_definitions: Some(self.match_definitions),
             })
         }
@@ -709,7 +715,7 @@ impl<'a> Tree<'a> {
             let src_len = self.tvb.remaining_length(self.tvb.offset) as usize;
             let src_data = std::slice::from_raw_parts(src_ptr, src_len);
 
-            // TODO: Check memory here as well
+            // This allocates memory for the lifetime of the packet.
             let dst_ptr = self.pinfo.alloc_bytes(&vec![0; length as usize]);
             let dst_data = std::slice::from_raw_parts_mut(dst_ptr, length as usize);
 
