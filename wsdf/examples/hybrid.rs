@@ -781,6 +781,13 @@ impl Dissector {
         proto_tree: *mut epan_sys::proto_tree,
         protocol: &Protocol,
     ) -> c_int {
+        // There's not a guarantee that the proto_tree that will be passed in by wireshark is
+        // not NULL. In the case that it is null, it is used for other validation purposes in
+        // wireshark so while you can still add expert info, it seems advisable to not build
+        // a tree at all. More details can be found in 2.12 Optimizations in README.dissectors
+        if proto_tree.is_null() {
+            return epan_sys::tvb_captured_length(tvb) as i32;
+        }
         let mut tree = Tree::new(protocol, pinfo, proto_tree, tvb, 0);
         (self.inner)(&mut tree)
     }
