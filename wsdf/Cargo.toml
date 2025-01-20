@@ -45,5 +45,5 @@ name = "multi"
 crate-type = ["cdylib"]
 
 [[example]]
-name = "hybrid"
+name = "builder"
 crate-type = ["cdylib"]

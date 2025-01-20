@@ -1,6 +1,6 @@
 use super::{protocol::*, types::*};
 use epan_sys;
-use std::ffi::{c_int, c_void};
+use std::ffi::c_int;
 
 pub struct Dissector {
     inner: Box<dyn Fn(&mut Tree) -> i32>,
