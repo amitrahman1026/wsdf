@@ -1,3 +1,21 @@
+pub fn to_c_str(s: &str) -> *const i8 {
+    // +1 for null terminator
+    let size = s.len() + 1;
+    let c_str = unsafe {
+        let ptr = epan_sys::wmem_alloc(epan_sys::wmem_epan_scope(), size) as *mut i8;
+        ptr.copy_from(s.as_ptr() as *const i8, s.len());
+        *ptr.add(s.len()) = 0;
+        ptr
+    };
+
+    c_str
+}
+
+pub enum DissectorDecodeFrom {
+    DecodeAs(String),
+    Uint(String, Vec<u32>),
+}
+
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone)]
 pub enum FieldType {
