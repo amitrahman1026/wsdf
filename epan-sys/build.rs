@@ -108,7 +108,7 @@ fn clone_wireshark_or_die() {
 
 fn build_wireshark() -> PathBuf {
     let result = std::panic::catch_unwind(|| {
-        cmake::Config::new("wireshark")
+        let dst = cmake::Config::new("wireshark")
             .define("BUILD_androiddump", "OFF")
             .define("BUILD_capinfos", "OFF")
             .define("BUILD_captype", "OFF")
@@ -133,7 +133,20 @@ fn build_wireshark() -> PathBuf {
             .define("BUILD_wifidump", "OFF")
             .define("BUILD_wireshark", "OFF")
             .define("BUILD_xxx2deb", "OFF")
-            .build()
+            .build();
+        assert!(
+            Command::new("cmake")
+                .arg("-DCOMPONENT=Development")
+                .arg("-P")
+                .arg("cmake_install.cmake")
+                .current_dir(dst.join("build"))
+                .status()
+                .unwrap()
+                .success(),
+            "should generate header files"
+        );
+
+        dst
     });
     match result {
         Ok(path) => path,

@@ -32,6 +32,10 @@ Types of changes:
 - Added safe wrapper around FFI from epan-sys for object oriented API
 - Added builder pattern for creating dissectors & plugins
 
+### Fixed
+
+- Fixed [issue](https://github.com/ghpr-asia/wsdf/pull/20#issuecomment-2566095501) with build.rs not generating correct include directories for wireshark via cmake
+
 ## [v0.2.0-alpha.1] - 2024-12-16
 
 ### Added
@@ -40,7 +44,7 @@ Types of changes:
 - Rust workspace resolver version '2' is added.
 - Added option to specify type of wireshark plugin created, with a fallback to Epan type plugin
 - Added support for wsdf generated plugins to load correctly on macOS
-- Added `Proto`, `Dissect` traits that greatly simplify internal data model for dissectors as teh basis for the next release
+- Added `Proto`, `Dissect` traits that greatly simplify internal data model for dissectors as the basis for the next release
 - Added support for modifying "info" column
 
 ### Changed
