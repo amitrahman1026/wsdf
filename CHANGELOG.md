@@ -29,6 +29,13 @@ Types of changes:
 
 ### Added
 
+- Added safe wrapper around FFI from epan-sys for object oriented API
+- Added builder pattern for creating dissectors & plugins
+
+## [v0.2.0-alpha.1] - 2024-12-16
+
+### Added
+
 - Added [CHANGELOG](https://github.com/amitrahman1026/wsdf/pull/2)
 - Rust workspace resolver version '2' is added.
 - Added option to specify type of wireshark plugin created, with a fallback to Epan type plugin
@@ -49,12 +56,13 @@ Types of changes:
 
 - Deprecated [0.1.0]'s brittle `Protocol`, `ProtocolField` based API
 
-## [0.1.0] - 2015-08-04
+## [0.1.0] - 2023-08-04
 
 ### Added
 
 - Initial release of the project.
 
-[unreleased]: https://github.com/amitrahman1026/wsdf
+[Unreleased]: https://github.com/amitrahman1026/wsdf/tree/unstable
+[v0.2.0-alpha.1]: https://github.com/amitrahman1026/wsdf/releases/tag/v0.2.0-alpha.1
 [0.1.0]: https://github.com/ghpr-asia/wsdf 
 <!-- #TODO: Add release tag for current version of wsdf on ghpr -->
