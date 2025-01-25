@@ -1,4 +1,4 @@
-use super::{dissector::*, types::*};
+use super::{dissector::*, plugin::*, types::*};
 use epan_sys;
 use std::{
     collections::HashMap,
@@ -92,7 +92,6 @@ impl Protocol {
         }
     }
     pub(crate) fn get_ett_handle(&self, id: &str) -> c_int {
-        // self.ett_handles.get(idx as usize).expect("ETT handle index out of bounds, use set_num_ett during protocol creation to set the number of ETT fields").clone()
         self.ett_handles
             .get(id)
             .expect(&format!("ETT '{}' not registered", id))
@@ -193,7 +192,7 @@ impl Protocol {
     pub fn get_expert_field(&self, id: &str) -> Option<&ExpertFieldHandle> {
         self.expert_module.expert_fields_handles.get(id)
     }
-    // Routine to be called to register all header fields, ETT types, expert fields
+    // Routine to be called from the proto_plugin.register_protoinfo in plugin registration
     pub fn register(&mut self) {
         let fields_to_register = self.field_defs.clone();
         let expert_infos_to_register = self.expert_module.expert_info_defs.clone();
@@ -216,6 +215,41 @@ impl Protocol {
                 }
             }
         }
+    }
+
+    pub unsafe extern "C" fn dissector_dispatch(
+        &self,
+        tvb: *mut epan_sys::tvbuff,
+        pinfo: *mut epan_sys::_packet_info,
+        tree: *mut epan_sys::proto_tree,
+    ) -> c_int {
+        (self.dissector_fn).dispatch(tvb, pinfo, tree, self)
+    }
+
+    pub unsafe extern "C" fn dissector_handler(
+        tvb: *mut epan_sys::tvbuff,
+        pinfo: *mut epan_sys::_packet_info,
+        tree: *mut epan_sys::proto_tree,
+        _data: *mut c_void,
+    ) -> c_int {
+        let curr_proto = (*pinfo).current_proto;
+
+        // Here we can always retrieve the name of protocol from pinfo
+        let id = match std::ffi::CStr::from_ptr(curr_proto).to_str() {
+            Ok(id) => id,
+            Err(_) => return 0, // This shouldn't happen as long as the protcols are registered correctly in wsdf's macros
+        };
+        let result = Plugin::with(|plugin| {
+            if let Some(protocol) = plugin.get_protocol(id) {
+                let protocol = protocol.borrow();
+                protocol.dissector_dispatch(tvb, pinfo, tree)
+            } else {
+                // Shouldn't reach here either
+                0
+            }
+        });
+
+        result
     }
 }
 
@@ -302,7 +336,7 @@ pub struct ExpertModule {
     expert_info_defs: Vec<ExpertFieldInfo>,
     // Lookup for expert field handles
     expert_fields_handles: HashMap<String, ExpertFieldHandle>,
-    // Innter ptr to expert field modules
+    // Inner ptr to expert field modules
     ptr: *mut epan_sys::expert_module_t,
 }
 
