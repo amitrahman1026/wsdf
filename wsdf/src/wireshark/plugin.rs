@@ -94,6 +94,12 @@ impl Plugin {
 #[macro_export]
 macro_rules! plugin {
     ($build_fn:expr) => {
+        // Default plugin metadata
+        #[no_mangle]
+        pub extern "C" fn plugin_describe() -> u32 {
+            wsdf::epan_sys::WS_PLUGIN_DESC_DISSECTOR
+        }
+
         #[no_mangle]
         pub extern "C" fn plugin_register() {
             Plugin::initialize();
@@ -129,11 +135,81 @@ macro_rules! plugin {
         #[no_mangle]
         #[used]
         #[allow(non_upper_case_globals)]
-        static plugin_version: [std::ffi::c_char; 6usize] = [48i8, 46i8, 48i8, 46i8, 49i8, 0i8];
+        static plugin_version: [std::ffi::c_char; 6] = [48i8, 46i8, 48i8, 46i8, 49i8, 0i8];
+
         #[no_mangle]
         #[used]
         #[allow(non_upper_case_globals)]
         static plugin_want_major: std::ffi::c_uint = epan_sys::WIRESHARK_VERSION_MAJOR;
+
+        #[no_mangle]
+        #[used]
+        #[allow(non_upper_case_globals)]
+        static plugin_want_minor: std::ffi::c_uint = epan_sys::WIRESHARK_VERSION_MINOR;
+    };
+    (type: $plugin_type:expr, version: $version:expr, protocols: [$($protocol_fn:expr),+ $(,)?]) => {
+        #[no_mangle]
+        pub extern "C" fn plugin_describe() -> u32 {
+            $plugin_type.to_constant()
+        }
+
+        const fn make_version_array() -> [std::ffi::c_char; 32] {
+            let version = $version;
+            let bytes = version.as_bytes();
+            let mut chars = [0i8; 32];
+            let mut i = 0;
+
+            while i < bytes.len() && i < 31 {
+                let b = bytes[i];
+                    chars[i] = b as std::ffi::c_char;
+                i += 1;
+            }
+            chars
+        }
+
+        #[no_mangle]
+        pub extern "C" fn plugin_register() {
+            Plugin::initialize();
+
+            static PLUG: epan_sys::proto_plugin = epan_sys::proto_plugin {
+                register_protoinfo: Some(proto_register_protos),
+                register_handoff: Some(proto_reg_handoff),
+            };
+
+            unsafe {
+                epan_sys::proto_register_plugin(&PLUG);
+            }
+        }
+
+        #[no_mangle]
+        pub unsafe extern "C" fn proto_register_protos() {
+            Plugin::with(|plugin| {
+                $(
+                    if let Ok(protocol) = $protocol_fn() {
+                        plugin.add_protocol(protocol);
+                    }
+                )+
+                plugin.register_protocols();
+            });
+        }
+
+        #[no_mangle]
+        pub unsafe extern "C" fn proto_reg_handoff() {
+            Plugin::with(|plugin| {
+                plugin.handoff_protocols();
+            });
+        }
+
+        #[no_mangle]
+        #[used]
+        #[allow(non_upper_case_globals)]
+        static plugin_version: [std::ffi::c_char; 32] = make_version_array();
+
+        #[no_mangle]
+        #[used]
+        #[allow(non_upper_case_globals)]
+        static plugin_want_major: std::ffi::c_uint = epan_sys::WIRESHARK_VERSION_MAJOR;
+
         #[no_mangle]
         #[used]
         #[allow(non_upper_case_globals)]

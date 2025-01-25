@@ -452,6 +452,29 @@ pub enum Column {
     Info = epan_sys::COL_INFO as i32,
 }
 
+#[derive(Copy, Clone)]
+pub enum PluginType {
+    Dissector,
+    FileType,
+    Codec,
+    Epan,
+    TapListener,
+    DFilter,
+}
+
+impl PluginType {
+    pub fn to_constant(&self) -> u32 {
+        match self {
+            PluginType::Dissector => epan_sys::WS_PLUGIN_DESC_DISSECTOR,
+            PluginType::FileType => epan_sys::WS_PLUGIN_DESC_FILE_TYPE,
+            PluginType::Codec => epan_sys::WS_PLUGIN_DESC_CODEC,
+            PluginType::Epan => epan_sys::WS_PLUGIN_DESC_EPAN,
+            PluginType::TapListener => epan_sys::WS_PLUGIN_DESC_TAP_LISTENER,
+            PluginType::DFilter => epan_sys::WS_PLUGIN_DESC_DFILTER,
+        }
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum RegistrationError {
     #[error("Protocol registration failed")]
