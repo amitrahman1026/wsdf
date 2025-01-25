@@ -15,7 +15,7 @@ impl Dissector {
     }
 
     // This is where wireshark presents a packet to the ffi interface
-    pub unsafe fn dispatch(
+    pub(crate) unsafe fn process_packet(
         &self,
         tvb: *mut epan_sys::tvbuff,
         pinfo: *mut epan_sys::packet_info,

@@ -217,16 +217,16 @@ impl Protocol {
         }
     }
 
-    pub unsafe extern "C" fn dissector_dispatch(
+    pub(crate) unsafe extern "C" fn dispatch_to_dissector(
         &self,
         tvb: *mut epan_sys::tvbuff,
         pinfo: *mut epan_sys::_packet_info,
         tree: *mut epan_sys::proto_tree,
     ) -> c_int {
-        (self.dissector_fn).dispatch(tvb, pinfo, tree, self)
+        (self.dissector_fn).process_packet(tvb, pinfo, tree, self)
     }
 
-    pub unsafe extern "C" fn dissector_handler(
+    pub(crate) unsafe extern "C" fn dissector_handler(
         tvb: *mut epan_sys::tvbuff,
         pinfo: *mut epan_sys::_packet_info,
         tree: *mut epan_sys::proto_tree,
@@ -242,7 +242,7 @@ impl Protocol {
         let result = Plugin::with(|plugin| {
             if let Some(protocol) = plugin.get_protocol(id) {
                 let protocol = protocol.borrow();
-                protocol.dissector_dispatch(tvb, pinfo, tree)
+                protocol.dispatch_to_dissector(tvb, pinfo, tree)
             } else {
                 // Shouldn't reach here either
                 0
