@@ -141,7 +141,7 @@ impl Protocol {
         let summary = to_c_str(&info.summary);
 
         let ei_info = epan_sys::ei_register_info {
-            ids: expert_field_ptr as *mut epan_sys::expert_field,
+            ids: expert_field_ptr,
             eiinfo: epan_sys::expert_field_info {
                 name,
                 group: info.group.to_u32() as i32,
@@ -189,11 +189,11 @@ impl Protocol {
             Err(RegistrationError::RegistrationFailed)
         }
     }
-    pub fn get_expert_field(&self, id: &str) -> Option<&ExpertFieldHandle> {
+    pub(crate) fn get_expert_field(&self, id: &str) -> Option<&ExpertFieldHandle> {
         self.expert_module.expert_fields_handles.get(id)
     }
     // Routine to be called from the proto_plugin.register_protoinfo in plugin registration
-    pub fn register(&mut self) {
+    pub(crate) fn register(&mut self) {
         let fields_to_register = self.field_defs.clone();
         let expert_infos_to_register = self.expert_module.expert_info_defs.clone();
 
@@ -316,23 +316,23 @@ impl FieldBuilder {
     }
 }
 
-pub struct FieldHandle {
+pub(crate) struct FieldHandle {
     pub(crate) handle: c_int,
 }
 
 #[derive(Clone)]
-pub struct Ett {
+pub(crate) struct Ett {
     id: String,
     _name: String,
 }
 
-pub struct EttHandle {
+pub(crate) struct EttHandle {
     handle: c_int,
 }
 
 pub const ROOT_ETT_ID: &str = "_root";
 
-pub struct ExpertModule {
+pub(crate) struct ExpertModule {
     expert_info_defs: Vec<ExpertFieldInfo>,
     // Lookup for expert field handles
     expert_fields_handles: HashMap<String, ExpertFieldHandle>,
@@ -340,13 +340,13 @@ pub struct ExpertModule {
     ptr: *mut epan_sys::expert_module_t,
 }
 
-pub struct ExpertFieldHandle {
+pub(crate) struct ExpertFieldHandle {
     pub(crate) ei: c_int,
     pub(crate) hf: c_int,
 }
 
 #[derive(Clone)]
-pub struct ExpertFieldInfo {
+struct ExpertFieldInfo {
     id: String,
     group: ExpertGroup,
     severity: ExpertSeverity,
