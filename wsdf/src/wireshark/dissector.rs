@@ -29,8 +29,12 @@ impl Dissector {
         if proto_tree.is_null() {
             return epan_sys::tvb_captured_length(tvb) as i32;
         }
-        let mut tree = Tree::new(protocol, pinfo, proto_tree, tvb, 0);
-        (self.inner)(&mut tree)
+        let tree = Tree::new(protocol, pinfo, proto_tree, tvb, 0);
+        if let Ok(mut tree) = tree {
+            (self.inner)(&mut tree)
+        } else {
+            0
+        }
     }
 }
 
@@ -55,15 +59,28 @@ impl Tvb {
 
     // The get_DATA() type functions should do the book keeping required for the underlying managed buffer
 
-    pub fn get_uint8(&mut self, _offset: i32) -> u8 {
+    pub fn get_uint8(&mut self, _offset: i32) -> Result<u8, DissectorError> {
+        if self.offset >= self.length() {
+            return Err(DissectorError::TvbError {
+                offset: self.offset,
+                kind: TvbErrorKind::OutOfBounds,
+            });
+        }
+
         unsafe {
             let ret = epan_sys::tvb_get_uint8(self.ptr, self.offset);
             self.offset += 1;
-            ret
+            Ok(ret)
         }
     }
 
-    pub fn get_uint16(&mut self, _offset: i32, encoding: Encoding) -> u16 {
+    pub fn get_uint16(&mut self, _offset: i32, encoding: Encoding) -> Result<u16, DissectorError> {
+        if self.offset + 2 >= self.length() {
+            return Err(DissectorError::TvbError {
+                offset: self.offset,
+                kind: TvbErrorKind::OutOfBounds,
+            });
+        }
         unsafe {
             let ret = match encoding {
                 Encoding::BigEndian => epan_sys::tvb_get_ntohs(self.ptr, self.offset),
@@ -71,7 +88,7 @@ impl Tvb {
                 _ => epan_sys::tvb_get_letohs(self.ptr, self.offset),
             };
             self.offset += 2;
-            ret
+            Ok(ret)
         }
     }
     pub unsafe fn new_child_real_data(
@@ -117,8 +134,8 @@ impl PacketInfo {
         Self { ptr }
     }
     // This raw pointer is managed by the block allocator of wmem
-    pub unsafe fn alloc_raw_string(&self, s: &str) -> *const i8 {
-        let c_str = std::ffi::CString::new(s).unwrap();
+    pub unsafe fn alloc_string(&self, s: &str) -> *const i8 {
+        let c_str = std::ffi::CString::new(s).expect("msg");
         unsafe {
             let size = s.len() + 1; // +1 for null terminator
             let ptr = epan_sys::wmem_alloc((*self.ptr).pool, size) as *mut i8;
@@ -135,7 +152,7 @@ impl PacketInfo {
     }
     pub fn set_column_text(&self, col: Column, text: &str) {
         unsafe {
-            let text = self.alloc_raw_string(text);
+            let text = self.alloc_string(text);
             epan_sys::col_clear((*self.ptr).cinfo, col as i32);
             epan_sys::col_add_str((*self.ptr).cinfo, col as i32, text);
         }
@@ -146,7 +163,7 @@ impl PacketInfo {
         }
     }
     pub unsafe fn add_data_source(&self, tvb: &Tvb, name: &str) {
-        let name = self.alloc_raw_string(name);
+        let name = self.alloc_string(name);
         epan_sys::add_new_data_source(self.ptr, tvb.ptr, name);
     }
 }
@@ -167,7 +184,7 @@ impl<'a> Tree<'a> {
         parent: *mut epan_sys::proto_node,
         tvb: *mut epan_sys::tvbuff,
         offset: i32,
-    ) -> Self {
+    ) -> TreeResult<Self> {
         let item = epan_sys::proto_tree_add_item(
             parent,
             protocol.get_proto_handle(),
@@ -176,35 +193,80 @@ impl<'a> Tree<'a> {
             -1,
             epan_sys::ENC_NA,
         );
-        // The actual subtree for display
-        let current = epan_sys::proto_item_add_subtree(item, protocol.get_ett_handle(ROOT_ETT_ID));
 
-        Self {
+        if item.is_null() {
+            return Err(TreeError::AddItemFailed(
+                "Failed to create root item".into(),
+            ));
+        }
+
+        let ett_handle = protocol
+            .get_ett_handle(ROOT_ETT_ID)
+            .ok_or(TreeError::EttNotFound(format!(
+                "Ett '{}' not found",
+                ROOT_ETT_ID
+            )))?;
+
+        // The actual subtree for display
+        let current = epan_sys::proto_item_add_subtree(item, ett_handle);
+
+        if current.is_null() {
+            return Err(TreeError::InvalidSubtreeOperation(
+                "Failed to create root subtree".into(),
+            ));
+        }
+
+        Ok(Self {
             protocol,
             pinfo: PacketInfo::new(pinfo),
             tvb: Tvb::new(tvb),
             current_node: current,
             current_item: item,
-        }
+        })
     }
     pub fn get_reported_length(&self) -> i32 {
         unsafe { epan_sys::tvb_reported_length(self.tvb.ptr) as i32 }
     }
-    pub fn add_subtree(&mut self, field_id: &str, ett_id: &str) -> Option<Tree<'a>> {
+    pub fn add_subtree(&mut self, field_id: &str, ett_id: &str) -> TreeResult<Tree<'a>> {
+        let field_handle = self
+            .protocol
+            .get_field_handle(field_id)
+            .ok_or_else(|| TreeError::AddItemFailed(format!("Field '{}' not found", field_id)))?;
+
         unsafe {
             let item = epan_sys::proto_tree_add_item(
                 self.current_node,
-                self.protocol.get_field_handle(field_id)?.handle,
+                field_handle.handle,
                 self.tvb.ptr,
                 self.tvb.offset, // New subtrees should be added at the current offset of the parent subtree's tvb
                 0,               // Length will be set when sub tree is ended
                 epan_sys::ENC_NA,
             );
 
-            let subtree =
-                epan_sys::proto_item_add_subtree(item, self.protocol.get_ett_handle(ett_id));
+            if item.is_null() {
+                return Err(TreeError::AddItemFailed(format!(
+                    "Failed to create item for field '{}'",
+                    field_id
+                )));
+            }
+            let ett_handle = self
+                .protocol
+                .get_ett_handle(ett_id)
+                .ok_or(TreeError::EttNotFound(format!(
+                    "Ett '{}' not found",
+                    ett_id
+                )))?;
 
-            Some(Tree {
+            let subtree = epan_sys::proto_item_add_subtree(item, ett_handle);
+
+            if subtree.is_null() {
+                return Err(TreeError::InvalidSubtreeOperation(format!(
+                    "Failed to create subtree for field '{}'",
+                    field_id
+                )));
+            }
+
+            Ok(Tree {
                 protocol: self.protocol,
                 pinfo: self.pinfo,
                 tvb: self.tvb,
@@ -229,17 +291,34 @@ impl<'a> Tree<'a> {
         field_id: &str,
         length: i32,
         encoding: Encoding,
-    ) -> Option<TreeItem> {
+    ) -> TreeResult<TreeItem> {
         unsafe {
+            let field_handle = self.protocol.get_field_handle(field_id).ok_or_else(|| {
+                TreeError::AddItemFailed(format!("Field '{}' not found", field_id))
+            })?;
+
+            if self.tvb.offset + length > self.tvb.length() {
+                return Err(TreeError::AddItemFailed(format!(
+                    "TVB access error at offset {}",
+                    self.tvb.offset
+                )));
+            }
+
             let item = epan_sys::proto_tree_add_item(
                 self.current_node,
-                self.protocol.get_field_handle(field_id)?.handle,
+                field_handle.handle,
                 self.tvb.ptr,
                 self.tvb.offset,
                 length,
                 encoding.to_u32(),
             );
 
+            if item.is_null() {
+                return Err(TreeError::AddItemFailed(format!(
+                    "Failed to create item for field '{}'",
+                    field_id
+                )));
+            }
             let item_tvb = Tvb {
                 ptr: self.tvb.ptr,
                 start: self.tvb.offset,
@@ -248,11 +327,7 @@ impl<'a> Tree<'a> {
 
             self.tvb.offset += length;
 
-            if !item.is_null() {
-                Some(TreeItem::new(item, self.pinfo, item_tvb))
-            } else {
-                None
-            }
+            Ok(TreeItem::new(item, self.pinfo, item_tvb))
         }
     }
     pub fn add_expert_info(
@@ -260,8 +335,11 @@ impl<'a> Tree<'a> {
         item: &mut TreeItem,
         expert_id: &str,
         text: Option<&str>,
-    ) -> Option<()> {
-        let handle = self.protocol.get_expert_field(expert_id)?;
+    ) -> Result<(), ExpertError> {
+        let handle = self
+            .protocol
+            .get_expert_field(expert_id)
+            .ok_or_else(|| ExpertError::FieldNotFound(expert_id.to_string()))?;
 
         unsafe {
             let mut expert_field = epan_sys::expert_field {
@@ -270,7 +348,7 @@ impl<'a> Tree<'a> {
             };
             if let Some(text) = text {
                 // Custom text
-                let text_ptr = self.pinfo.alloc_raw_string(text);
+                let text_ptr = self.pinfo.alloc_string(text);
                 epan_sys::expert_add_info_format(
                     self.pinfo.ptr,
                     item.ptr,
@@ -286,7 +364,7 @@ impl<'a> Tree<'a> {
                 );
             }
         }
-        Some(())
+        Ok(())
     }
     // New Tree with a different TVB buffer but within same protocol context
     pub unsafe fn with_tvb(&self, tvb: Tvb) -> Self {
@@ -340,14 +418,14 @@ impl TreeItem {
     }
     pub fn set_text(&mut self, text: &str) {
         unsafe {
-            let text = self.pinfo.alloc_raw_string(text);
+            let text = self.pinfo.alloc_string(text);
             epan_sys::proto_item_set_text(self.ptr, text);
         }
     }
 
     pub fn append_text(&mut self, text: &str) {
         unsafe {
-            let text = self.pinfo.alloc_raw_string(text);
+            let text = self.pinfo.alloc_string(text);
             epan_sys::proto_item_append_text(self.ptr, text);
         }
     }

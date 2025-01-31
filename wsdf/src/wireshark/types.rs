@@ -487,8 +487,6 @@ pub enum WiresharkError {
     DissectorError(#[from] DissectorError),
     #[error("Expert info error: {0}")]
     ExpertError(#[from] ExpertError),
-    #[error("Memory allocation error: {0}")]
-    MemoryError(#[from] MemoryError),
     #[error("Tree operation error: {0}")]
     TreeError(#[from] TreeError),
 }
@@ -525,14 +523,6 @@ pub enum TreeError {
     InvalidSubtreeOperation(String),
     #[error("Ett not found: {0}")]
     EttNotFound(String),
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum MemoryError {
-    #[error("Failed to allocate memory in packet pool")]
-    PacketPoolAllocation,
-    #[error("Failed to allocate string: {0}")]
-    StringAllocation(#[from] std::ffi::NulError),
 }
 
 #[derive(Debug, thiserror::Error)]

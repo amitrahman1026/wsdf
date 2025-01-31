@@ -91,11 +91,8 @@ impl Protocol {
             Err(RegistrationError::RegistrationFailed)
         }
     }
-    pub(crate) fn get_ett_handle(&self, id: &str) -> c_int {
-        self.ett_handles
-            .get(id)
-            .expect(&format!("ETT '{}' not registered", id))
-            .handle
+    pub(crate) fn get_ett_handle(&self, id: &str) -> Option<c_int> {
+        Some(self.ett_handles.get(id)?.handle)
     }
     // This should be called by the Protocol.register routine unless you know what you're doing
     unsafe fn register_ett(&mut self) {
