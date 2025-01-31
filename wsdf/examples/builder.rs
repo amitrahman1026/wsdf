@@ -19,13 +19,13 @@ pub fn build_example_protocol() -> Result<Protocol, RegistrationError> {
             let mut field1_item = header_tree
                 .add_item("field1", 1, Encoding::BigEndian)
                 .unwrap();
-            header_tree.add_expert_info(&mut field1_item, "expert_condition1", None);
+            let _ = header_tree.add_expert_info(&mut field1_item, "expert_condition1", None);
 
             // Second field shows text manipulation
             let mut field2_item = header_tree
                 .add_item("field2", 2, Encoding::BigEndian)
                 .unwrap();
-            header_tree.add_expert_info(
+            let _ = header_tree.add_expert_info(
                 &mut field2_item,
                 "expert_condition2",
                 Some("Custom expert info with dynamic text!"),
@@ -42,7 +42,10 @@ pub fn build_example_protocol() -> Result<Protocol, RegistrationError> {
             let mut flag_item: TreeItem = payload_tree
                 .add_item("comp_flag", 1, Encoding::BigEndian)
                 .unwrap();
-            let flag_value = flag_item.tvb.get_uint8(payload_tree.tvb.start);
+            let flag_value = flag_item
+                .tvb
+                .get_uint8(payload_tree.tvb.start)
+                .expect("out of bounds");
 
             let mut size_item = payload_tree
                 .add_item("orig_size", 2, Encoding::BigEndian)
@@ -50,7 +53,7 @@ pub fn build_example_protocol() -> Result<Protocol, RegistrationError> {
             let orig_size = size_item
                 .tvb
                 .get_uint16(payload_tree.tvb.offset, Encoding::BigEndian)
-                as u32;
+                .expect("Out of bounds") as u32;
 
             tree.end_subtree(&payload_tree);
 
@@ -82,13 +85,13 @@ pub fn build_example_protocol() -> Result<Protocol, RegistrationError> {
                         .add_item("decompressed_data", orig_size as i32, Encoding::NA)
                         .unwrap();
 
-                    tree.add_expert_info(
+                    let _ = tree.add_expert_info(
                         &mut payload_item,
                         "expert_transform",
                         Some("Data was decompressed - each byte duplicated"),
                     );
 
-                    tree.pinfo.set_column_text(
+                    let _ = tree.pinfo.set_column_text(
                         Column::Info,
                         &format!("Decompressed {} bytes of data", orig_size),
                     );
@@ -98,7 +101,7 @@ pub fn build_example_protocol() -> Result<Protocol, RegistrationError> {
 
                 // Just show raw bytes for uncompressed data
                 let mut payload_item = tree.add_item("raw_data", 4, Encoding::NA).unwrap();
-                tree.add_expert_info(
+                let _ = tree.add_expert_info(
                     &mut payload_item,
                     "expert_transform",
                     Some("Uncompressed data shown directly!"),
