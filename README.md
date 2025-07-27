@@ -1,43 +1,29 @@
+<!-- 
 [![docs.rs](https://img.shields.io/badge/docs.rs-wsdf-latest)](https://docs.rs/wsdf)
 [![crates.io](https://img.shields.io/crates/v/wsdf.svg)](https://crates.io/crates/wsdf)
 [![CI](https://github.com/ghpr-asia/wsdf/actions/workflows/ci.yml/badge.svg)](https://github.com/ghpr-asia/wsdf/actions/workflows/ci.yml)
+-->
 
-**wsdf** (**W**ire**s**hark **D**issector **F**ramework) is a proc-macro based
-framework to generate Wireshark dissectors from your Rust data types. Using
-wsdf, you can write dissectors in a declarative way, all from within Rust.
+**wsdf** (**W**ire**s**hark **D**issector **F**ramework) framework to generate
+Wireshark dissectors plugin generator from your Rust data types.
 
-Here is what a complete dissector for UDP looks like:
+**wsdf** aims to provide familiar interfaces in a dissector writing framework
+that is as fast to prototype in as lua with all the declarative API, while still
+being compiled down and installed natively for performance.
 
-```rust
-use wsdf::{protocol, version, Dissect, Proto};
-
-version!("0.0,1", 4, 0);
-protocol!(Udp);
-
-#[derive(Proto, Dissect)]
-#[wsdf(decode_from = [("ip.proto", 17)])]
-struct Udp {
-    src_port: u16,
-    dst_port: u16,
-    length: u16,
-    checksum: u16,
-    #[wsdf(subdissector = ("udp.port", "dst_port", "src_port"))]
-    payload: Vec<u8>,
-}
-```
-
-Check out the [docs](https://docs.rs/wsdf) for more information. Some
-[examples](wsdf/examples/) are also available, including a simple dissector for
-DNS, showcased below.
-
-![DNS dissector showcase](https://raw.githubusercontent.com/ghpr-asia/wsdf/main/docs/dns_dissector.gif)
-
-wsdf has been tested on macOS & Linux against Wireshark 4.4.x.
+> [!IMPORTANT]
+>
+> **wsdf** was previously released as a proc-macro based framework. This fork
+> builds on the work previously done as the original wsdf is no longer
+> maintained. In no way is new code added related to my current nor past
+> employers, barring code that was already open sourced. All derived works are
+> not related to the financial industry, and this crate aims to be another tool
+> kit in a programmers inventory for networking analysis and similar work.
 
 **License**
 
 <sup>
-Licensed under either of <a href="LICENSE-APACHE">Apache License, Version
+Licensed permissively under either of <a href="LICENSE-APACHE">Apache License, Version
 2.0</a> or <a href="LICENSE-MIT">MIT license</a> at your option.
 </sup>
 
