@@ -2,6 +2,27 @@ use super::{protocol::*, types::*};
 use epan_sys;
 use std::ffi::c_int;
 
+/// A packet dissector implementation.
+///
+/// Dissectors contain the logic for analyzing packet contents and building
+/// the protocol tree.
+///
+/// # Example
+///
+/// ```rust
+/// let dissector = Dissector::new(|tree| {
+///     // Add version field
+///     let item = tree.add_item("version", 1, Encoding::BigEndian)?;
+///
+///     // Add subtree
+///     let mut subtree = tree.add_subtree("header", "header_fields")?;
+///
+///     // Process more fields...
+///
+///     tree.end_subtree(&subtree);
+///     0
+/// });
+/// ```
 pub struct Dissector {
     inner: Box<dyn Fn(&mut Tree) -> i32>,
 }

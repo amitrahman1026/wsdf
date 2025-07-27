@@ -16,6 +16,9 @@ pub enum DissectorDecodeFrom {
     Uint(String, Vec<u32>),
 }
 
+/// Field types supported by Wireshark.
+///
+/// These correspond to the FT_* types in Wireshark's ftypes.h.
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone)]
 pub enum FieldType {

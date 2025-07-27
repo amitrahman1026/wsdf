@@ -39,35 +39,7 @@ generate fresh bindings to replace this one. As such, please avoid passing the
 --all-features flag when building this crate, since it drastically increases
 the build time.
 
-1.2 wsdf-derive
-
-The codegen logic lives here. We have these modules:
-
-    - util: helper functions and types
-    - attributes: defines and parses attributes, e.g. #[wsdf(hide)]
-    - model: data model for structs and enums
-    - crate root: ties everything together
-
-This crate's purpose is to take the input (a struct or enum) and generate the
-right code for use in a dissector. To that end, we have two "abstractions" to
-help us:
-
-	- StructInnard: a type representing the internals of a struct-like object.
-	  This includes structs as well as enum variants.
-	- Enum: an enum.
-
-These two types, their methods, along with some helper functions are reponsible
-for generating the correct code. A top-down view of this entier codegen process
-can be found in lib.rs. Check the proc-macro definition for Dissect (a function
-named derive_dissect) and follow along for the big picture.
-
-The actual generated code is pretty simple at a high level:
-
-	- When the plugin is loaded, for each protocol, register the protocol and
-	  all its fields.
-	- When the dissect routine is invoked, recursively dissect each field.
-
-1.2. wsdf
+1.1. wsdf
 
 This is the crate which users are meant to install. It serves three purposes:
 
@@ -83,16 +55,4 @@ them. This crate implements the traits for basic types like the integers,
 Vec<u8>, etc. More impls can be added in the future for other types (e.g. Box<T>
 can be interpreted as T for dissection purposes) to make this super generic and
 "loose".
-
-3. Tests and examples
-
-cargo test will run all tests.
-
-There are some regular unit tests scattered around. We also use the trybuild
-crate (https://docs.rs/trybuild/latest/trybuild/) to test if some kind of
-syntax compiles or not. The things to test are found in wsdf/tests/. Some are
-meant to compile, while some are meant to fail.
-
-We have some examples in wsdf/examples/. These are also useful for debugging
-the generated code via cargo expand.
 

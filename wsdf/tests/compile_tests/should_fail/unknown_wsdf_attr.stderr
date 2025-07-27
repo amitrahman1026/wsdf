@@ -1,5 +1,0 @@
-error: unrecognized attribute
- --> tests/compile_tests/should_fail/unknown_wsdf_attr.rs:6:8
-  |
-6 | #[wsdf(foo = "bar")] // Unknown meta item
-  |        ^^^^^^^^^^^
