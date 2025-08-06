@@ -135,7 +135,7 @@ macro_rules! plugin {
         #[no_mangle]
         #[used]
         #[allow(non_upper_case_globals)]
-        static plugin_version: [std::ffi::c_char; 6] = [48i8, 46i8, 48i8, 46i8, 49i8, 0i8];
+        static plugin_version: [std::ffi::c_char; 6] = [48, 46, 48, 46, 49, 0];
 
         #[no_mangle]
         #[used]
