@@ -31,6 +31,7 @@ Types of changes:
 
 - Added safe wrapper around FFI from epan-sys for object oriented API
 - Added builder pattern for creating dissectors & plugins
+- Removed proc macro code.
 
 ### Fixed
 
