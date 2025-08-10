@@ -1,3 +1,17 @@
+API Improvements
+    Tree API Enhancement: Implement RAII-style tree management to eliminate
+    end_subtree calls
+
+    Preferences System: Add configuration/preferences support like Lua API
+
+    Heuristic Dissectors: Implement heuristic dissector registration
+
+Developer Experience
+    Build System: Improve platform detection and Wireshark version compatibility
+
+    Installation Tools: Automated plugin installation and management
+
+
 Be aware of possible incoming changes to the plugin API
 
     There is [discussion](https://lists.wireshark.org/archives/wireshark-dev/202312/msg00000.html)
