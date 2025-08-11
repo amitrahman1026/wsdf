@@ -1,0 +1,160 @@
+// wslua_listener.c
+[#lua_module_Listener]
+=== Post-Dissection Packet Analysis
+
+// wslua_listener.c
+[#lua_class_Listener]
+==== Listener
+
+A `Listener` is called once for every packet that matches a certain filter or has a certain tap.
+It can read the tree, the packet's <<lua_class_Tvb,`Tvb`>> buffer as well as the tapped data, but it cannot add elements to the tree.
+
+// wslua_listener.c
+[#lua_fn_Listener_new__tap____filter____allfields__]
+===== Listener.new([tap], [filter], [allfields])
+
+Creates a new `Listener` tap object.
+
+[float]
+===== Arguments
+
+tap (optional)::
+
+The name of this tap. See <<lua_fn_Listener_list__,`Listener.list()`>> for a way to print valid listener names.
+
+// function_arg_footer: tap (optional)
+filter (optional)::
+
+A display filter to apply to the tap.
+The `tap.packet` function will be called for each matching packet.
+The default is `nil`, which matches every packet.
+Example: "m2tp".
+
+// function_arg_footer: filter (optional)
+allfields (optional)::
+
+Whether to generate all fields.
+The default is `false`.
+Note: This impacts performance.
+
+// function_arg_footer: allfields (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The newly created Listener listener object
+
+// function_returns_footer: Listener.new
+[float]
+===== Errors
+
+* tap registration error
+
+// function_errors_footer: Listener.new
+// function_footer: Listener_new__tap____filter____allfields__
+
+// wslua_listener.c
+[#lua_fn_Listener_list__]
+===== Listener.list()
+
+Gets a Lua array table of all registered `Listener` tap names.
+
+Note: This is an expensive operation, and should only be used for troubleshooting.
+===== Example
+
+[source,lua]
+----
+    -- Print a list of tap listeners to stdout.
+    for _,tap_name in pairs(Listener.list()) do
+            print(tap_name)
+    end
+----
+
+[float]
+===== Returns
+
+The array table of registered tap names
+
+// function_returns_footer: Listener.list
+// function_footer: Listener_list__
+
+// wslua_listener.c
+[#lua_fn_listener_remove__]
+===== listener:remove()
+
+Removes a tap `Listener`.
+
+// function_footer: listener_remove__
+
+// wslua_listener.c
+[#lua_fn_listener___tostring__]
+===== listener:__tostring()
+
+Generates a string of debug info for the tap `Listener`.
+
+// function_footer: listener___tostring__
+
+[#lua_class_attrib_listener_packet]
+===== listener.packet
+
+Mode: Assign only.
+
+A function that will be called once every packet matches the
+`Listener` listener filter.
+
+When later called by Wireshark, the `packet` function will be given:
+
+1. A `Pinfo` object
+2. A `Tvb` object
+3. A `tapinfo` table
+
+[source,lua]
+----
+    function tap.packet(pinfo,tvb,tapinfo) ... end
+----
+
+[NOTE]
+====
+`tapinfo` is a table of info based on the `Listener` type, or nil.
+
+See _epan/wslua/taps_ for `tapinfo` structure definitions.
+====
+
+// End listener.packet
+
+[#lua_class_attrib_listener_draw]
+===== listener.draw
+
+Mode: Assign only.
+
+A function that will be called once every few seconds to redraw the GUI objects;
+in TShark this function is called only at the very end of the capture file.
+
+When later called by Wireshark, the `draw` function will not be given any arguments.
+
+[source,lua]
+----
+    function tap.draw() ... end
+----
+
+// End listener.draw
+
+[#lua_class_attrib_listener_reset]
+===== listener.reset
+
+Mode: Assign only.
+
+A function that will be called at the end of the capture run.
+
+When later called by Wireshark, the `reset` function will not be given any arguments.
+
+[source,lua]
+----
+    function tap.reset() ... end
+----
+
+// End listener.reset
+
+// class_footer: Listener
+// end of module

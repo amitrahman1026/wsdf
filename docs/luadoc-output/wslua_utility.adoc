@@ -1,0 +1,311 @@
+// wslua_utility.c
+[#lua_module_Utility]
+=== Utility Functions
+[#global_functions_Utility]
+==== Global Functions
+
+// wslua_utility.c
+[#lua_fn_get_version__]
+===== get_version()
+
+Gets the Wireshark version as a string.
+
+[float]
+===== Returns
+
+The version string, e.g. "3.2.5".
+
+// function_returns_footer: get_version
+// function_footer: get_version__
+
+// wslua_utility.c
+[#lua_fn_set_plugin_info_table_]
+===== set_plugin_info(table)
+
+Set a Lua table with meta-data about the plugin, such as version.
+
+The passed-in Lua table entries need to be keyed/indexed by the following:
+
+* "version" with a string value identifying the plugin version (required)
+* "description" with a string value describing the plugin (optional)
+* "author" with a string value of the author's name(s) (optional)
+* "repository" with a string value of a URL to a repository (optional)
+
+Not all of the above key entries need to be in the table. The 'version'
+entry is required, however. The others are not currently used for anything, but
+might be in the future and thus using them might be useful. Table entries keyed
+by other strings are ignored, and do not cause an error.
+
+===== Example
+
+[source,lua]
+----
+    local my_info = {
+        version = "1.0.1",
+        author = "Jane Doe",
+        repository = "https://github.com/octocat/Spoon-Knife"
+    }
+
+    set_plugin_info(my_info)
+----
+
+[float]
+===== Arguments
+
+table::
+
+The Lua table of information.
+
+// function_arg_footer: table
+// end of function_args
+
+// function_footer: set_plugin_info_table_
+
+// wslua_utility.c
+[#lua_fn_format_date_timestamp_]
+===== format_date(timestamp)
+
+Formats an absolute timestamp into a human readable date.
+
+[float]
+===== Arguments
+
+timestamp::
+
+A timestamp value to convert.
+
+// function_arg_footer: timestamp
+// end of function_args
+
+[float]
+===== Returns
+
+A string with the formated date
+
+// function_returns_footer: format_date
+// function_footer: format_date_timestamp_
+
+// wslua_utility.c
+[#lua_fn_format_time_timestamp_]
+===== format_time(timestamp)
+
+Formats a relative timestamp in a human readable time.
+
+[float]
+===== Arguments
+
+timestamp::
+
+A timestamp value to convert.
+
+// function_arg_footer: timestamp
+// end of function_args
+
+[float]
+===== Returns
+
+A string with the formated time
+
+// function_returns_footer: format_time
+// function_footer: format_time_timestamp_
+
+// wslua_utility.c
+[#lua_fn_get_preference_preference_]
+===== get_preference(preference)
+
+Get a preference value.
+
+[float]
+===== Arguments
+
+preference::
+
+The name of the preference.
+
+// function_arg_footer: preference
+// end of function_args
+
+[float]
+===== Returns
+
+The preference value, or nil if not found.
+
+// function_returns_footer: get_preference
+// function_footer: get_preference_preference_
+
+// wslua_utility.c
+[#lua_fn_set_preference_preference__value_]
+===== set_preference(preference, value)
+
+Set a preference value.
+
+[float]
+===== Arguments
+
+preference::
+
+The name of the preference.
+
+// function_arg_footer: preference
+value::
+
+The preference value to set.
+
+// function_arg_footer: value
+// end of function_args
+
+[float]
+===== Returns
+
+true if changed, false if unchanged or nil if not found.
+
+// function_returns_footer: set_preference
+// function_footer: set_preference_preference__value_
+
+// wslua_utility.c
+[#lua_fn_reset_preference_preference_]
+===== reset_preference(preference)
+
+Reset a preference to default value.
+
+[float]
+===== Arguments
+
+preference::
+
+The name of the preference.
+
+// function_arg_footer: preference
+// end of function_args
+
+[float]
+===== Returns
+
+true if valid preference
+
+// function_returns_footer: reset_preference
+// function_footer: reset_preference_preference_
+
+// wslua_utility.c
+[#lua_fn_apply_preferences__]
+===== apply_preferences()
+
+Write preferences to file and apply changes.
+
+// function_footer: apply_preferences__
+
+// wslua_utility.c
+[#lua_fn_report_failure_text_]
+===== report_failure(text)
+
+Reports a failure to the user.
+
+[float]
+===== Arguments
+
+text::
+
+Message text to report.
+
+// function_arg_footer: text
+// end of function_args
+
+// function_footer: report_failure_text_
+
+// wslua_utility.c
+[#lua_fn_dofile_filename_]
+===== dofile(filename)
+
+Loads a Lua file and executes it as a Lua chunk, similar to the standard
+https://www.lua.org/manual/5.4/manual.html#pdf-dofile[dofile]
+but searches additional directories.
+The search order is the current directory, followed by the user's
+https://www.wireshark.org/docs/wsug_html_chunked/ChAppFilesConfigurationSection.html[personal configuration]
+directory, and finally the
+https://www.wireshark.org/docs/wsug_html_chunked/ChAppFilesConfigurationSection.html[global configuration]
+directory.
+
+[TIP]
+.The configuration directories are not the plugin directories.
+====
+The configuration directories searched are not the global and personal plugin
+directories. All Lua files in the plugin directories are loaded at startup;
+`dofile` is for loading files from additional locations.
+The file path can be absolute or relative to one of the search directories.
+====
+
+[float]
+===== Arguments
+
+filename::
+
+Name of the file to be run. If the file does not exist in the current directory, the user and system directories are searched.
+
+// function_arg_footer: filename
+// end of function_args
+
+// function_footer: dofile_filename_
+
+// wslua_utility.c
+[#lua_fn_loadfile_filename_]
+===== loadfile(filename)
+
+Loads a Lua file and compiles it into a Lua chunk, similar to the standard
+https://www.lua.org/manual/5.4/manual.html#pdf-loadfile[loadfile]
+but searches additional directories.
+The search order is the current directory, followed by the user's
+https://www.wireshark.org/docs/wsug_html_chunked/ChAppFilesConfigurationSection.html[personal configuration]
+directory, and finally the
+https://www.wireshark.org/docs/wsug_html_chunked/ChAppFilesConfigurationSection.html[global configuration]
+directory.
+
+===== Example
+
+[source,lua]
+----
+    -- Assume foo.lua contains definition for foo(a,b). Load the chunk
+    -- from the file and execute it to add foo(a,b) to the global table.
+    -- These two lines are effectively the same as dofile('foo.lua').
+    local loaded_chunk = assert(loadfile('foo.lua'))
+    loaded_chunk()
+
+    -- ok to call foo at this point
+    foo(1,2)
+----
+
+[float]
+===== Arguments
+
+filename::
+
+Name of the file to be loaded. If the file does not exist in the current directory, the user and system directories are searched.
+
+// function_arg_footer: filename
+// end of function_args
+
+// function_footer: loadfile_filename_
+
+// wslua_utility.c
+[#lua_fn_register_stat_cmd_arg_argument___action__]
+===== register_stat_cmd_arg(argument, [action])
+
+Register a function to handle a `-z` option
+
+[float]
+===== Arguments
+
+argument::
+
+The name of the option argument.
+
+// function_arg_footer: argument
+action (optional)::
+
+The function to be called when the command is invoked.
+
+// function_arg_footer: action (optional)
+// end of function_args
+
+// function_footer: register_stat_cmd_arg_argument___action__
+// Global function
+// end of module

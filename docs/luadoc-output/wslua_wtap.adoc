@@ -1,0 +1,124 @@
+// wslua_wtap.c
+[#lua_module_Wtap]
+=== Wtap Functions For Handling Capture File Types
+[#global_functions_Wtap]
+==== Global Functions
+
+// wslua_wtap.c
+[#lua_fn_wtap_file_type_subtype_description_filetype_]
+===== wtap_file_type_subtype_description(filetype)
+
+Get a string describing a capture file type, given a filetype
+value for that file type.
+
+[float]
+===== Arguments
+
+filetype::
+
+The type for which the description is to be fetched - a number returned by `wtap_name_to_file_type_subtype()`.
+
+// function_arg_footer: filetype
+// end of function_args
+
+[float]
+===== Returns
+
+The description of the file type with that filetype value, or nil if there is no such file type.
+
+// function_returns_footer: wtap_file_type_subtype_description
+// function_footer: wtap_file_type_subtype_description_filetype_
+
+// wslua_wtap.c
+[#lua_fn_wtap_file_type_subtype_name_filetype_]
+===== wtap_file_type_subtype_name(filetype)
+
+Get a string giving the name for a capture file type, given a filetype
+value for that file type.
+
+[float]
+===== Arguments
+
+filetype::
+
+The type for which the name is to be fetched - a number returned by `wtap_name_to_file_type_subtype()`.
+
+// function_arg_footer: filetype
+// end of function_args
+
+[float]
+===== Returns
+
+The name of the file type with that filetype value, or nil if there is no such file type.
+
+// function_returns_footer: wtap_file_type_subtype_name
+// function_footer: wtap_file_type_subtype_name_filetype_
+
+// wslua_wtap.c
+[#lua_fn_wtap_name_to_file_type_subtype_name_]
+===== wtap_name_to_file_type_subtype(name)
+
+Get a filetype value for a file type, given the name for that
+file type.
+
+[float]
+===== Arguments
+
+name::
+
+The name of a file type.
+
+// function_arg_footer: name
+// end of function_args
+
+[float]
+===== Returns
+
+The filetype value for the file type with that name, or nil if there is no such file type.
+
+// function_returns_footer: wtap_name_to_file_type_subtype
+// function_footer: wtap_name_to_file_type_subtype_name_
+
+// wslua_wtap.c
+[#lua_fn_wtap_pcap_file_type_subtype__]
+===== wtap_pcap_file_type_subtype()
+
+Get the filetype value for pcap files.
+
+[float]
+===== Returns
+
+The filetype value for pcap files.
+
+// function_returns_footer: wtap_pcap_file_type_subtype
+// function_footer: wtap_pcap_file_type_subtype__
+
+// wslua_wtap.c
+[#lua_fn_wtap_pcap_nsec_file_type_subtype__]
+===== wtap_pcap_nsec_file_type_subtype()
+
+Get the filetype value for nanosecond-resolution pcap files.
+
+[float]
+===== Returns
+
+The filetype value for nanosecond-resolution pcap files.
+
+// function_returns_footer: wtap_pcap_nsec_file_type_subtype
+// function_footer: wtap_pcap_nsec_file_type_subtype__
+
+// wslua_wtap.c
+[#lua_fn_wtap_pcapng_file_type_subtype__]
+===== wtap_pcapng_file_type_subtype()
+
+Get the filetype value for pcapng files.
+
+[float]
+===== Returns
+
+The filetype value for pcapng files.
+
+// function_returns_footer: wtap_pcapng_file_type_subtype
+// function_footer: wtap_pcapng_file_type_subtype__
+// Global function
+// end of module

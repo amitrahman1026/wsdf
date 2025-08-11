@@ -1,0 +1,1135 @@
+// wslua_int64.c
+[#lua_module_Int64]
+=== Handling 64-bit Integers
+
+Lua uses one single number representation, which is chosen at compile time, and since it is often set to IEEE 754 double precision floating point, one cannot store 64 bit integers with full precision.
+
+Lua numbers are stored as floating point (doubles) internally, not integers; thus while they can represent incredibly large numbers, above 2^53 they lose integral precision -- they can't represent every whole integer value.
+For example if you set a lua variable to the number 9007199254740992 and tried to increment it by 1, you'd get the same number because it can't represent 9007199254740993 (only the even number 9007199254740994).
+
+Therefore, in order to count higher than 2^53 in integers, we need a true integer type.
+The way this is done is with an explicit 'Int64' or 'UInt64' object (i.e., Lua userdata).
+This object has metamethods for all of the math and comparison operators, so you can handle it like any number variable.
+For the math operators, it can even be mixed with plain Lua numbers.
+
+For example 'my64num = my64num + 1' will work even if 'my64num' is a <<lua_class_Int64,`Int64`>> or <<lua_class_UInt64,`UInt64`>> object.
+Note that comparison operators ('==','$$<=$$','>', etc.) will not work with plain numbers -- only other Int64/UInt64 objects.
+This is a limitation of Lua itself, in terms of how it handles operator overloading.
+
+[WARNING]
+====
+Many of the UInt64/Int64 functions accept a Lua number as an argument.
+You should be very careful to never use Lua numbers bigger than 32 bits (i.e., the number value 4,294,967,295 or the literal 0xFFFFFFFF) for such arguments, because Lua itself does not handle bigger numbers consistently across platforms (32-bit vs. 64-bit systems), and because a Lua number is a C-code double which cannot have more than 53 bits of precision.
+Instead, use a Int64 or UInt64 for the argument.
+====
+
+For example, do this...
+
+[source,lua]
+----
+    local mynum = UInt64(0x2b89dd1e, 0x3f91df0b)
+----
+
+...instead of this:
+
+[source,lua]
+----
+    -- Bad. Leads to inconsistent results across platforms
+    local mynum = UInt64(0x3f91df0b2b89dd1e)
+----
+
+And do this...
+
+[source,lua]
+----
+    local masked = mynum:band(UInt64(0, 0xFFFFFFFF))
+----
+
+...instead of this:
+
+[source,lua]
+----
+    -- Bad. Leads to inconsistent results across platforms
+    local masked = mynum:band(0xFFFFFFFF00000000)
+----
+
+[NOTE]
+====
+Lua 5.3 and later adds a second number representation for integers, which is also chosen at compile time. It is usually a 64-bit signed integer type, even on 32-bit platforms.
+(Lua 5.2 and earlier have an integer type, but this is not used for storing numbers, only for casting, and on 32-bit platforms is 32-bits wide.)
+Wireshark 4.4 and later will use the Lua integer type where possible, but as storing
+64-bit unsigned integers in a Lua Integer can result in signed number overflow, `UInt64`
+is still necessary. `Int64` is also still available for use.
+====
+
+// wslua_int64.c
+[#lua_class_Int64]
+==== Int64
+
+<<lua_class_Int64,`Int64`>> represents a 64 bit signed integer.
+
+Note the caveats <<lua_module_Int64,listed above>>.
+
+// wslua_int64.c
+[#lua_fn_Int64_decode_string___endian__]
+===== Int64.decode(string, [endian])
+
+Decodes an 8-byte Lua string, using the given endianness, into a new <<lua_class_Int64,`Int64`>> object.
+
+[float]
+===== Arguments
+
+string::
+
+The Lua string containing a binary 64-bit integer.
+
+// function_arg_footer: string
+endian (optional)::
+
+If set to true then little-endian is used,
+if false then big-endian; if missing or `nil`, native
+host endian.
+
+// function_arg_footer: endian (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_Int64,`Int64`>> object created, or nil on failure.
+
+// function_returns_footer: Int64.decode
+// function_footer: Int64_decode_string___endian__
+
+// wslua_int64.c
+[#lua_fn_Int64_new__value____highvalue__]
+===== Int64.new([value], [highvalue])
+
+Creates a <<lua_class_Int64,`Int64`>> object.
+
+[float]
+===== Arguments
+
+value (optional)::
+
+A number, <<lua_class_UInt64,`UInt64`>>, <<lua_class_Int64,`Int64`>>, or string of ASCII digits
+to assign the value of the new <<lua_class_Int64,`Int64`>>. Default is 0.
+
+// function_arg_footer: value (optional)
+highvalue (optional)::
+
+If this is a number and the first argument was
+a number, then the first will be treated as a
+lower 32 bits, and this is the high-order 32
+bit number.
+
+// function_arg_footer: highvalue (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The new <<lua_class_Int64,`Int64`>> object.
+
+// function_returns_footer: Int64.new
+// function_footer: Int64_new__value____highvalue__
+
+// wslua_int64.c
+[#lua_fn_Int64_max__]
+===== Int64.max()
+
+Creates an <<lua_class_Int64,`Int64`>> of the maximum possible positive value. In other words, this should return an Int64 object of the number 9,223,372,036,854,775,807.
+
+[float]
+===== Returns
+
+The new <<lua_class_Int64,`Int64`>> object of the maximum value.
+
+// function_returns_footer: Int64.max
+// function_footer: Int64_max__
+
+// wslua_int64.c
+[#lua_fn_Int64_min__]
+===== Int64.min()
+
+Creates an <<lua_class_Int64,`Int64`>> of the minimum possible negative value. In other words, this should return an Int64 object of the number -9,223,372,036,854,775,808.
+
+[float]
+===== Returns
+
+The new <<lua_class_Int64,`Int64`>> object of the minimum value.
+
+// function_returns_footer: Int64.min
+// function_footer: Int64_min__
+
+// wslua_int64.c
+[#lua_fn_Int64_fromhex_hex_]
+===== Int64.fromhex(hex)
+
+Creates an <<lua_class_Int64,`Int64`>> object from the given hexadecimal string.
+
+[float]
+===== Arguments
+
+hex::
+
+The hex-ASCII Lua string.
+
+// function_arg_footer: hex
+// end of function_args
+
+[float]
+===== Returns
+
+The new <<lua_class_Int64,`Int64`>> object.
+
+// function_returns_footer: Int64.fromhex
+// function_footer: Int64_fromhex_hex_
+
+// wslua_int64.c
+[#lua_fn_int64_encode__endian__]
+===== int64:encode([endian])
+
+Encodes the <<lua_class_Int64,`Int64`>> number into an 8-byte Lua string using the given endianness.
+
+[float]
+===== Arguments
+
+endian (optional)::
+
+If set to true then little-endian is used,
+if false then big-endian; if missing or `nil`,
+native host endian.
+
+// function_arg_footer: endian (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The Lua string.
+
+// function_returns_footer: int64:encode
+// function_footer: int64_encode__endian__
+
+// wslua_int64.c
+[#lua_fn_int64___call__]
+===== int64:__call()
+
+Creates a <<lua_class_Int64,`Int64`>> object.
+
+[float]
+===== Returns
+
+The new <<lua_class_Int64,`Int64`>> object.
+
+// function_returns_footer: int64:__call
+// function_footer: int64___call__
+
+// wslua_int64.c
+[#lua_fn_int64_tonumber__]
+===== int64:tonumber()
+
+Returns a Lua number of the <<lua_class_Int64,`Int64`>> value. Note that this may lose precision.
+
+[float]
+===== Returns
+
+The Lua number.
+
+// function_returns_footer: int64:tonumber
+// function_footer: int64_tonumber__
+
+// wslua_int64.c
+[#lua_fn_int64_tohex__numbytes__]
+===== int64:tohex([numbytes])
+
+Returns a hexadecimal string of the <<lua_class_Int64,`Int64`>> value.
+
+[float]
+===== Arguments
+
+numbytes (optional)::
+
+The number of hex chars/nibbles to generate.
+A negative value generates uppercase. Default is 16.
+
+// function_arg_footer: numbytes (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The string hex.
+
+// function_returns_footer: int64:tohex
+// function_footer: int64_tohex__numbytes__
+
+// wslua_int64.c
+[#lua_fn_int64_higher__]
+===== int64:higher()
+
+Returns a Lua number of the higher 32 bits of the <<lua_class_Int64,`Int64`>> value. A negative <<lua_class_Int64,`Int64`>>
+will return a negative Lua number.
+
+[float]
+===== Returns
+
+The Lua number.
+
+// function_returns_footer: int64:higher
+// function_footer: int64_higher__
+
+// wslua_int64.c
+[#lua_fn_int64_lower__]
+===== int64:lower()
+
+Returns a Lua number of the lower 32 bits of the <<lua_class_Int64,`Int64`>> value. This will always be positive.
+
+[float]
+===== Returns
+
+The Lua number.
+
+// function_returns_footer: int64:lower
+// function_footer: int64_lower__
+
+// wslua_int64.c
+[#lua_fn_int64___tostring__]
+===== int64:__tostring()
+
+Converts the <<lua_class_Int64,`Int64`>> into a string of decimal digits.
+
+[float]
+===== Returns
+
+The Lua string.
+
+// function_returns_footer: int64:__tostring
+// function_footer: int64___tostring__
+
+// wslua_int64.c
+[#lua_fn_int64___unm__]
+===== int64:__unm()
+
+Returns the negative of the <<lua_class_Int64,`Int64`>> as a new <<lua_class_Int64,`Int64`>>.
+
+[float]
+===== Returns
+
+The new <<lua_class_Int64,`Int64`>>.
+
+// function_returns_footer: int64:__unm
+// function_footer: int64___unm__
+
+// wslua_int64.c
+[#lua_fn_int64___add__]
+===== int64:__add()
+
+Adds two <<lua_class_Int64,`Int64`>> together and returns a new one. The value may wrapped.
+
+// function_footer: int64___add__
+
+// wslua_int64.c
+[#lua_fn_int64___sub__]
+===== int64:__sub()
+
+Subtracts two <<lua_class_Int64,`Int64`>> and returns a new one. The value may wrapped.
+
+// function_footer: int64___sub__
+
+// wslua_int64.c
+[#lua_fn_int64___mul__]
+===== int64:__mul()
+
+Multiplies two <<lua_class_Int64,`Int64`>> and returns a new one. The value may truncated.
+
+// function_footer: int64___mul__
+
+// wslua_int64.c
+[#lua_fn_int64___div__]
+===== int64:__div()
+
+Divides two <<lua_class_Int64,`Int64`>> and returns a new one. Integer divide, no remainder.
+Trying to divide by zero results in a Lua error.
+
+[float]
+===== Returns
+
+The <<lua_class_Int64,`Int64`>> object.
+
+// function_returns_footer: int64:__div
+// function_footer: int64___div__
+
+// wslua_int64.c
+[#lua_fn_int64___mod__]
+===== int64:__mod()
+
+Divides two <<lua_class_Int64,`Int64`>> and returns a new one of the remainder.
+Trying to modulo by zero results in a Lua error.
+
+[float]
+===== Returns
+
+The <<lua_class_Int64,`Int64`>> object.
+
+// function_returns_footer: int64:__mod
+// function_footer: int64___mod__
+
+// wslua_int64.c
+[#lua_fn_int64___pow__]
+===== int64:__pow()
+
+The first <<lua_class_Int64,`Int64`>> is taken to the power of the second <<lua_class_Int64,`Int64`>>, returning a new
+one. This may truncate the value.
+
+[float]
+===== Returns
+
+The <<lua_class_Int64,`Int64`>> object.
+
+// function_returns_footer: int64:__pow
+// function_footer: int64___pow__
+
+// wslua_int64.c
+[#lua_fn_int64___eq__]
+===== int64:__eq()
+
+Returns `true` if both <<lua_class_Int64,`Int64`>> are equal.
+
+// function_footer: int64___eq__
+
+// wslua_int64.c
+[#lua_fn_int64___lt__]
+===== int64:__lt()
+
+Returns `true` if first <<lua_class_Int64,`Int64`>> is less than the second.
+
+// function_footer: int64___lt__
+
+// wslua_int64.c
+[#lua_fn_int64___le__]
+===== int64:__le()
+
+Returns `true` if the first <<lua_class_Int64,`Int64`>> is less than or equal to the second.
+
+// function_footer: int64___le__
+
+// wslua_int64.c
+[#lua_fn_int64_bnot__]
+===== int64:bnot()
+
+Returns a <<lua_class_Int64,`Int64`>> of the bitwise 'not' operation.
+
+[float]
+===== Returns
+
+The <<lua_class_Int64,`Int64`>> object.
+
+// function_returns_footer: int64:bnot
+// function_footer: int64_bnot__
+
+// wslua_int64.c
+[#lua_fn_int64_band__]
+===== int64:band()
+
+Returns a <<lua_class_Int64,`Int64`>> of the bitwise 'and' operation with the given number/`Int64`/`UInt64`.
+Note that multiple arguments are allowed.
+
+// function_footer: int64_band__
+
+// wslua_int64.c
+[#lua_fn_int64_bor__]
+===== int64:bor()
+
+Returns a <<lua_class_Int64,`Int64`>> of the bitwise 'or' operation, with the given number/`Int64`/`UInt64`.
+Note that multiple arguments are allowed.
+
+// function_footer: int64_bor__
+
+// wslua_int64.c
+[#lua_fn_int64_bxor__]
+===== int64:bxor()
+
+Returns a <<lua_class_Int64,`Int64`>> of the bitwise 'xor' operation, with the given number/`Int64`/`UInt64`.
+Note that multiple arguments are allowed.
+
+// function_footer: int64_bxor__
+
+// wslua_int64.c
+[#lua_fn_int64_lshift_numbits_]
+===== int64:lshift(numbits)
+
+Returns a <<lua_class_Int64,`Int64`>> of the bitwise logical left-shift operation, by the given
+number of bits.
+
+[float]
+===== Arguments
+
+numbits::
+
+The number of bits to left-shift by.
+
+// function_arg_footer: numbits
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_Int64,`Int64`>> object.
+
+// function_returns_footer: int64:lshift
+// function_footer: int64_lshift_numbits_
+
+// wslua_int64.c
+[#lua_fn_int64_rshift_numbits_]
+===== int64:rshift(numbits)
+
+Returns a <<lua_class_Int64,`Int64`>> of the bitwise logical right-shift operation, by the
+given number of bits.
+
+[float]
+===== Arguments
+
+numbits::
+
+The number of bits to right-shift by.
+
+// function_arg_footer: numbits
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_Int64,`Int64`>> object.
+
+// function_returns_footer: int64:rshift
+// function_footer: int64_rshift_numbits_
+
+// wslua_int64.c
+[#lua_fn_int64_arshift_numbits_]
+===== int64:arshift(numbits)
+
+Returns a <<lua_class_Int64,`Int64`>> of the bitwise arithmetic right-shift operation, by the
+given number of bits.
+
+[float]
+===== Arguments
+
+numbits::
+
+The number of bits to right-shift by.
+
+// function_arg_footer: numbits
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_Int64,`Int64`>> object.
+
+// function_returns_footer: int64:arshift
+// function_footer: int64_arshift_numbits_
+
+// wslua_int64.c
+[#lua_fn_int64_rol_numbits_]
+===== int64:rol(numbits)
+
+Returns a <<lua_class_Int64,`Int64`>> of the bitwise left rotation operation, by the given number of
+bits (up to 63).
+
+[float]
+===== Arguments
+
+numbits::
+
+The number of bits to roll left by.
+
+// function_arg_footer: numbits
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_Int64,`Int64`>> object.
+
+// function_returns_footer: int64:rol
+// function_footer: int64_rol_numbits_
+
+// wslua_int64.c
+[#lua_fn_int64_ror_numbits_]
+===== int64:ror(numbits)
+
+Returns a <<lua_class_Int64,`Int64`>> of the bitwise right rotation operation, by the given number of
+bits (up to 63).
+
+[float]
+===== Arguments
+
+numbits::
+
+The number of bits to roll right by.
+
+// function_arg_footer: numbits
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_Int64,`Int64`>> object.
+
+// function_returns_footer: int64:ror
+// function_footer: int64_ror_numbits_
+
+// wslua_int64.c
+[#lua_fn_int64_bswap__]
+===== int64:bswap()
+
+Returns a <<lua_class_Int64,`Int64`>> of the bytes swapped. This can be used to convert little-endian
+64-bit numbers to big-endian 64 bit numbers or vice versa.
+
+[float]
+===== Returns
+
+The <<lua_class_Int64,`Int64`>> object.
+
+// function_returns_footer: int64:bswap
+// function_footer: int64_bswap__
+
+// class_footer: Int64
+
+// wslua_int64.c
+[#lua_class_UInt64]
+==== UInt64
+
+<<lua_class_UInt64,`UInt64`>> represents a 64 bit unsigned integer, similar to <<lua_class_Int64,`Int64`>>.
+
+Note the caveats <<lua_module_Int64,listed above>>.
+
+// wslua_int64.c
+[#lua_fn_UInt64_decode_string___endian__]
+===== UInt64.decode(string, [endian])
+
+Decodes an 8-byte Lua binary string, using given endianness, into a new <<lua_class_UInt64,`UInt64`>> object.
+
+[float]
+===== Arguments
+
+string::
+
+The Lua string containing a binary 64-bit integer.
+
+// function_arg_footer: string
+endian (optional)::
+
+If set to true then little-endian is used,
+if false then big-endian; if missing or `nil`,
+native host endian.
+
+// function_arg_footer: endian (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_UInt64,`UInt64`>> object created, or nil on failure.
+
+// function_returns_footer: UInt64.decode
+// function_footer: UInt64_decode_string___endian__
+
+// wslua_int64.c
+[#lua_fn_UInt64_new__value____highvalue__]
+===== UInt64.new([value], [highvalue])
+
+Creates a <<lua_class_UInt64,`UInt64`>> object.
+
+[float]
+===== Arguments
+
+value (optional)::
+
+A number, <<lua_class_UInt64,`UInt64`>>, <<lua_class_Int64,`Int64`>>, or string of digits
+to assign the value of the new <<lua_class_UInt64,`UInt64`>>. Default is 0.
+
+// function_arg_footer: value (optional)
+highvalue (optional)::
+
+If this is a number and the first argument was
+a number, then the first will be treated as a
+lower 32 bits, and this is the high-order
+32-bit number.
+
+// function_arg_footer: highvalue (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The new <<lua_class_UInt64,`UInt64`>> object.
+
+// function_returns_footer: UInt64.new
+// function_footer: UInt64_new__value____highvalue__
+
+// wslua_int64.c
+[#lua_fn_UInt64_max__]
+===== UInt64.max()
+
+Creates a <<lua_class_UInt64,`UInt64`>> of the maximum possible value. In other words, this should return an UInt64 object of the number 18,446,744,073,709,551,615.
+
+[float]
+===== Returns
+
+The maximum value.
+
+// function_returns_footer: UInt64.max
+// function_footer: UInt64_max__
+
+// wslua_int64.c
+[#lua_fn_UInt64_min__]
+===== UInt64.min()
+
+Creates a <<lua_class_UInt64,`UInt64`>> of the minimum possible value. In other words, this should return an UInt64 object of the number 0.
+
+[float]
+===== Returns
+
+The minimum value.
+
+// function_returns_footer: UInt64.min
+// function_footer: UInt64_min__
+
+// wslua_int64.c
+[#lua_fn_UInt64_fromhex_hex_]
+===== UInt64.fromhex(hex)
+
+Creates a <<lua_class_UInt64,`UInt64`>> object from the given hex string.
+
+[float]
+===== Arguments
+
+hex::
+
+The hex-ASCII Lua string.
+
+// function_arg_footer: hex
+// end of function_args
+
+[float]
+===== Returns
+
+The new <<lua_class_UInt64,`UInt64`>> object.
+
+// function_returns_footer: UInt64.fromhex
+// function_footer: UInt64_fromhex_hex_
+
+// wslua_int64.c
+[#lua_fn_uint64_encode__endian__]
+===== uint64:encode([endian])
+
+Encodes the <<lua_class_UInt64,`UInt64`>> number into an 8-byte Lua binary string, using given endianness.
+
+[float]
+===== Arguments
+
+endian (optional)::
+
+If set to true then little-endian is used,
+if false then big-endian; if missing or `nil`,
+native host endian.
+
+// function_arg_footer: endian (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The Lua binary string.
+
+// function_returns_footer: uint64:encode
+// function_footer: uint64_encode__endian__
+
+// wslua_int64.c
+[#lua_fn_uint64___call__]
+===== uint64:__call()
+
+Creates a <<lua_class_UInt64,`UInt64`>> object.
+
+[float]
+===== Returns
+
+The new <<lua_class_UInt64,`UInt64`>> object.
+
+// function_returns_footer: uint64:__call
+// function_footer: uint64___call__
+
+// wslua_int64.c
+[#lua_fn_uint64_tonumber__]
+===== uint64:tonumber()
+
+Returns a Lua number of the <<lua_class_UInt64,`UInt64`>> value. This may lose precision.
+
+[float]
+===== Returns
+
+The Lua number.
+
+// function_returns_footer: uint64:tonumber
+// function_footer: uint64_tonumber__
+
+// wslua_int64.c
+[#lua_fn_uint64___tostring__]
+===== uint64:__tostring()
+
+Converts the <<lua_class_UInt64,`UInt64`>> into a string.
+
+[float]
+===== Returns
+
+The Lua string.
+
+// function_returns_footer: uint64:__tostring
+// function_footer: uint64___tostring__
+
+// wslua_int64.c
+[#lua_fn_uint64_tohex__numbytes__]
+===== uint64:tohex([numbytes])
+
+Returns a hex string of the <<lua_class_UInt64,`UInt64`>> value.
+
+[float]
+===== Arguments
+
+numbytes (optional)::
+
+The number of hex-chars/nibbles to generate.
+Negative means uppercase Default is 16.
+
+// function_arg_footer: numbytes (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The string hex.
+
+// function_returns_footer: uint64:tohex
+// function_footer: uint64_tohex__numbytes__
+
+// wslua_int64.c
+[#lua_fn_uint64_higher__]
+===== uint64:higher()
+
+Returns a Lua number of the higher 32 bits of the <<lua_class_UInt64,`UInt64`>> value.
+
+[float]
+===== Returns
+
+The Lua number.
+
+// function_returns_footer: uint64:higher
+// function_footer: uint64_higher__
+
+// wslua_int64.c
+[#lua_fn_uint64_lower__]
+===== uint64:lower()
+
+Returns a Lua number of the lower 32 bits of the <<lua_class_UInt64,`UInt64`>> value.
+
+[float]
+===== Returns
+
+The Lua number.
+
+// function_returns_footer: uint64:lower
+// function_footer: uint64_lower__
+
+// wslua_int64.c
+[#lua_fn_uint64___unm__]
+===== uint64:__unm()
+
+Returns the <<lua_class_UInt64,`UInt64`>> in a new <<lua_class_UInt64,`UInt64`>>, since unsigned integers can't be negated.
+
+[float]
+===== Returns
+
+The <<lua_class_UInt64,`UInt64`>> object.
+
+// function_returns_footer: uint64:__unm
+// function_footer: uint64___unm__
+
+// wslua_int64.c
+[#lua_fn_uint64___add__]
+===== uint64:__add()
+
+Adds two <<lua_class_UInt64,`UInt64`>> together and returns a new one. This may wrap the value.
+
+// function_footer: uint64___add__
+
+// wslua_int64.c
+[#lua_fn_uint64___sub__]
+===== uint64:__sub()
+
+Subtracts two <<lua_class_UInt64,`UInt64`>> and returns a new one. This may wrap the value.
+
+// function_footer: uint64___sub__
+
+// wslua_int64.c
+[#lua_fn_uint64___mul__]
+===== uint64:__mul()
+
+Multiplies two <<lua_class_UInt64,`UInt64`>> and returns a new one. This may truncate the value.
+
+// function_footer: uint64___mul__
+
+// wslua_int64.c
+[#lua_fn_uint64___div__]
+===== uint64:__div()
+
+Divides two <<lua_class_UInt64,`UInt64`>> and returns a new one. Integer divide, no remainder.
+Trying to divide by zero results in a Lua error.
+
+[float]
+===== Returns
+
+The <<lua_class_UInt64,`UInt64`>> result.
+
+// function_returns_footer: uint64:__div
+// function_footer: uint64___div__
+
+// wslua_int64.c
+[#lua_fn_uint64___mod__]
+===== uint64:__mod()
+
+Divides two <<lua_class_UInt64,`UInt64`>> and returns a new one of the remainder.
+Trying to modulo by zero results in a Lua error.
+
+[float]
+===== Returns
+
+The <<lua_class_UInt64,`UInt64`>> result.
+
+// function_returns_footer: uint64:__mod
+// function_footer: uint64___mod__
+
+// wslua_int64.c
+[#lua_fn_uint64___pow__]
+===== uint64:__pow()
+
+The first <<lua_class_UInt64,`UInt64`>> is taken to the power of the second <<lua_class_UInt64,`UInt64`>>/number,
+returning a new one. This may truncate the value.
+
+[float]
+===== Returns
+
+The <<lua_class_UInt64,`UInt64`>> object.
+
+// function_returns_footer: uint64:__pow
+// function_footer: uint64___pow__
+
+// wslua_int64.c
+[#lua_fn_uint64___eq__]
+===== uint64:__eq()
+
+Returns true if both <<lua_class_UInt64,`UInt64`>> are equal.
+
+// function_footer: uint64___eq__
+
+// wslua_int64.c
+[#lua_fn_uint64___lt__]
+===== uint64:__lt()
+
+Returns true if first <<lua_class_UInt64,`UInt64`>> is less than the second.
+
+// function_footer: uint64___lt__
+
+// wslua_int64.c
+[#lua_fn_uint64___le__]
+===== uint64:__le()
+
+Returns true if first <<lua_class_UInt64,`UInt64`>> is less than or equal to the second.
+
+// function_footer: uint64___le__
+
+// wslua_int64.c
+[#lua_fn_uint64_bnot__]
+===== uint64:bnot()
+
+Returns a <<lua_class_UInt64,`UInt64`>> of the bitwise 'not' operation.
+
+[float]
+===== Returns
+
+The <<lua_class_UInt64,`UInt64`>> object.
+
+// function_returns_footer: uint64:bnot
+// function_footer: uint64_bnot__
+
+// wslua_int64.c
+[#lua_fn_uint64_band__]
+===== uint64:band()
+
+Returns a <<lua_class_UInt64,`UInt64`>> of the bitwise 'and' operation, with the given number/`Int64`/`UInt64`.
+Note that multiple arguments are allowed.
+
+// function_footer: uint64_band__
+
+// wslua_int64.c
+[#lua_fn_uint64_bor__]
+===== uint64:bor()
+
+Returns a <<lua_class_UInt64,`UInt64`>> of the bitwise 'or' operation, with the given number/`Int64`/`UInt64`.
+Note that multiple arguments are allowed.
+
+// function_footer: uint64_bor__
+
+// wslua_int64.c
+[#lua_fn_uint64_bxor__]
+===== uint64:bxor()
+
+Returns a <<lua_class_UInt64,`UInt64`>> of the bitwise 'xor' operation, with the given number/`Int64`/`UInt64`.
+Note that multiple arguments are allowed.
+
+// function_footer: uint64_bxor__
+
+// wslua_int64.c
+[#lua_fn_uint64_lshift_numbits_]
+===== uint64:lshift(numbits)
+
+Returns a <<lua_class_UInt64,`UInt64`>> of the bitwise logical left-shift operation, by the
+given number of bits.
+
+[float]
+===== Arguments
+
+numbits::
+
+The number of bits to left-shift by.
+
+// function_arg_footer: numbits
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_UInt64,`UInt64`>> object.
+
+// function_returns_footer: uint64:lshift
+// function_footer: uint64_lshift_numbits_
+
+// wslua_int64.c
+[#lua_fn_uint64_rshift_numbits_]
+===== uint64:rshift(numbits)
+
+Returns a <<lua_class_UInt64,`UInt64`>> of the bitwise logical right-shift operation, by the
+given number of bits.
+
+[float]
+===== Arguments
+
+numbits::
+
+The number of bits to right-shift by.
+
+// function_arg_footer: numbits
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_UInt64,`UInt64`>> object.
+
+// function_returns_footer: uint64:rshift
+// function_footer: uint64_rshift_numbits_
+
+// wslua_int64.c
+[#lua_fn_uint64_arshift_numbits_]
+===== uint64:arshift(numbits)
+
+Returns a <<lua_class_UInt64,`UInt64`>> of the bitwise arithmetic right-shift operation, by the
+given number of bits.
+
+[float]
+===== Arguments
+
+numbits::
+
+The number of bits to right-shift by.
+
+// function_arg_footer: numbits
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_UInt64,`UInt64`>> object.
+
+// function_returns_footer: uint64:arshift
+// function_footer: uint64_arshift_numbits_
+
+// wslua_int64.c
+[#lua_fn_uint64_rol_numbits_]
+===== uint64:rol(numbits)
+
+Returns a <<lua_class_UInt64,`UInt64`>> of the bitwise left rotation operation, by the
+given number of bits (up to 63).
+
+[float]
+===== Arguments
+
+numbits::
+
+The number of bits to roll left by.
+
+// function_arg_footer: numbits
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_UInt64,`UInt64`>> object.
+
+// function_returns_footer: uint64:rol
+// function_footer: uint64_rol_numbits_
+
+// wslua_int64.c
+[#lua_fn_uint64_ror_numbits_]
+===== uint64:ror(numbits)
+
+Returns a <<lua_class_UInt64,`UInt64`>> of the bitwise right rotation operation, by the
+given number of bits (up to 63).
+
+[float]
+===== Arguments
+
+numbits::
+
+The number of bits to roll right by.
+
+// function_arg_footer: numbits
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_UInt64,`UInt64`>> object.
+
+// function_returns_footer: uint64:ror
+// function_footer: uint64_ror_numbits_
+
+// wslua_int64.c
+[#lua_fn_uint64_bswap__]
+===== uint64:bswap()
+
+Returns a <<lua_class_UInt64,`UInt64`>> of the bytes swapped. This can be used to convert little-endian
+64-bit numbers to big-endian 64 bit numbers or vice versa.
+
+[float]
+===== Returns
+
+The <<lua_class_UInt64,`UInt64`>> object.
+
+// function_returns_footer: uint64:bswap
+// function_footer: uint64_bswap__
+
+// class_footer: UInt64
+// end of module

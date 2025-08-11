@@ -1,0 +1,832 @@
+// wslua_nstime.c
+[#lua_module_Pinfo]
+=== Obtaining Packet Information
+
+// wslua_nstime.c
+[#lua_class_Address]
+==== Address
+
+Represents an address.
+
+// wslua_address.c
+[#lua_fn_Address_ip_hostname_]
+===== Address.ip(hostname)
+
+Creates an Address Object representing an IPv4 address.
+
+[float]
+===== Arguments
+
+hostname::
+
+The address or name of the IP host.
+
+// function_arg_footer: hostname
+// end of function_args
+
+[float]
+===== Returns
+
+The Address object.
+
+// function_returns_footer: Address.ip
+// function_footer: Address_ip_hostname_
+
+// wslua_address.c
+[#lua_fn_Address_ipv6_hostname_]
+===== Address.ipv6(hostname)
+
+Creates an Address Object representing an IPv6 address.
+
+[float]
+===== Arguments
+
+hostname::
+
+The address or name of the IP host.
+
+// function_arg_footer: hostname
+// end of function_args
+
+[float]
+===== Returns
+
+The Address object
+
+// function_returns_footer: Address.ipv6
+// function_footer: Address_ipv6_hostname_
+
+// wslua_address.c
+[#lua_fn_Address_ether_eth_]
+===== Address.ether(eth)
+
+Creates an Address Object representing an Ethernet address.
+
+[float]
+===== Arguments
+
+eth::
+
+The Ethernet address.
+
+// function_arg_footer: eth
+// end of function_args
+
+[float]
+===== Returns
+
+The Address object.
+
+// function_returns_footer: Address.ether
+// function_footer: Address_ether_eth_
+
+// wslua_address.c
+[#lua_fn_address___tostring__]
+===== address:__tostring()
+
+
+
+[float]
+===== Returns
+
+The string representing the address.
+
+// function_returns_footer: address:__tostring
+// function_footer: address___tostring__
+
+// wslua_address.c
+[#lua_fn_address___eq__]
+===== address:__eq()
+
+Compares two Addresses.
+
+// function_footer: address___eq__
+
+// wslua_address.c
+[#lua_fn_address___le__]
+===== address:__le()
+
+Compares two Addresses.
+
+// function_footer: address___le__
+
+// wslua_address.c
+[#lua_fn_address___lt__]
+===== address:__lt()
+
+Compares two Addresses.
+
+// function_footer: address___lt__
+
+// class_footer: Address
+
+// wslua_nstime.c
+[#lua_class_Column]
+==== Column
+
+A Column in the packet list.
+
+// wslua_column.c
+[#lua_fn_column___tostring__]
+===== column:__tostring()
+
+
+
+[float]
+===== Returns
+
+The column's string text (in parenthesis if not available).
+
+// function_returns_footer: column:__tostring
+// function_footer: column___tostring__
+
+// wslua_column.c
+[#lua_fn_column_clear__]
+===== column:clear()
+
+Clears a Column.
+
+// function_footer: column_clear__
+
+// wslua_column.c
+[#lua_fn_column_set_text_]
+===== column:set(text)
+
+Sets the text of a Column.
+
+[float]
+===== Arguments
+
+text::
+
+The text to which to set the Column.
+
+// function_arg_footer: text
+// end of function_args
+
+// function_footer: column_set_text_
+
+// wslua_column.c
+[#lua_fn_column_append_text_]
+===== column:append(text)
+
+Appends text to a Column.
+
+[float]
+===== Arguments
+
+text::
+
+The text to append to the Column.
+
+// function_arg_footer: text
+// end of function_args
+
+// function_footer: column_append_text_
+
+// wslua_column.c
+[#lua_fn_column_prepend_text_]
+===== column:prepend(text)
+
+Prepends text to a Column.
+
+[float]
+===== Arguments
+
+text::
+
+The text to prepend to the Column.
+
+// function_arg_footer: text
+// end of function_args
+
+// function_footer: column_prepend_text_
+
+// wslua_column.c
+[#lua_fn_column_fence__]
+===== column:fence()
+
+Sets Column text fence, to prevent overwriting.
+
+// function_footer: column_fence__
+
+// wslua_column.c
+[#lua_fn_column_clear_fence__]
+===== column:clear_fence()
+
+Clear Column text fence.
+
+// function_footer: column_clear_fence__
+
+// class_footer: Column
+
+// wslua_nstime.c
+[#lua_class_Columns]
+==== Columns
+
+The <<lua_class_Column,``Column``>>s of the packet list.
+
+// wslua_column.c
+[#lua_fn_columns___tostring__]
+===== columns:__tostring()
+
+
+
+[float]
+===== Returns
+
+The string "Columns". This has no real use aside from debugging.
+
+// function_returns_footer: columns:__tostring
+// function_footer: columns___tostring__
+
+// wslua_column.c
+[#lua_fn_columns___newindex_column__text_]
+===== columns:__newindex(column, text)
+
+Sets the text of a specific column.
+Some columns cannot be modified, and no error is raised if attempted.
+The columns that are known to allow modification are "info" and "protocol".
+
+[float]
+===== Arguments
+
+column::
+
+The name of the column to set.
+Valid values are:
+
+[options="header"]
+|===
+|Name |Description
+|number |Frame number
+|abs_time |Absolute timestamp
+|utc_time |UTC timestamp
+|cls_time |CLS timestamp
+|rel_time |Relative timestamp
+|date |Absolute date and time
+|date_doy |Absolute year, day of year, and time
+|utc_date |UTC date and time
+|utc_date_doy |UTC year, day of year, and time
+|delta_time |Delta time from previous packet
+|delta_time_displayed |Delta time from previous displayed packet
+|src |Source address
+|src_res |Resolved source address
+|src_unres |Numeric source address
+|dl_src |Source data link address
+|dl_src_res |Resolved source data link address
+|dl_src_unres |Numeric source data link address
+|net_src |Source network address
+|net_src_res |Resolved source network address
+|net_src_unres |Numeric source network address
+|dst |Destination address
+|dst_res |Resolve destination address
+|dst_unres |Numeric destination address
+|dl_dst |Destination data link address
+|dl_dst_res |Resolved destination data link address
+|dl_dst_unres |Numeric destination data link address
+|net_dst |Destination network address
+|net_dst_res |Resolved destination network address
+|net_dst_unres |Numeric destination network address
+|src_port |Source port
+|src_port_res |Resolved source port
+|src_port_unres |Numeric source port
+|dst_port |Destination port
+|dst_port_res |Resolved destination port
+|dst_port_unres |Numeric destination port
+|protocol |Protocol name
+|info |General packet information
+|packet_len |Packet length
+|cumulative_bytes |Cumulative bytes in the capture
+|direction |Packet direction
+|vsan |Virtual SAN
+|tx_rate |Transmit rate
+|rssi |RSSI value
+|dce_call |DCE call
+|===
+
+===== Example
+pinfo.cols['info'] = 'foo bar'
+
+-- syntactic sugar (equivalent to above)
+pinfo.cols.info = 'foo bar'
+
+// function_arg_footer: column
+text::
+
+The text for the column.
+
+// function_arg_footer: text
+// end of function_args
+
+// function_footer: columns___newindex_column__text_
+
+// wslua_column.c
+[#lua_fn_columns___index__]
+===== columns:__index()
+
+Get a specific <<lua_class_Column,``Column``>>.
+
+// function_footer: columns___index__
+
+// class_footer: Columns
+
+// wslua_nstime.c
+[#lua_class_NSTime]
+==== NSTime
+
+NSTime represents a nstime_t.  This is an object with seconds and nanoseconds.
+
+// wslua_nstime.c
+[#lua_fn_NSTime_new__seconds____nseconds__]
+===== NSTime.new([seconds], [nseconds])
+
+Creates a new NSTime object.
+
+[float]
+===== Arguments
+
+seconds (optional)::
+
+Seconds.
+
+// function_arg_footer: seconds (optional)
+nseconds (optional)::
+
+Nano seconds.
+
+// function_arg_footer: nseconds (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The new NSTime object.
+
+// function_returns_footer: NSTime.new
+// function_footer: NSTime_new__seconds____nseconds__
+
+// wslua_nstime.c
+[#lua_fn_nstime___call__seconds____nseconds__]
+===== nstime:__call([seconds], [nseconds])
+
+Creates a NSTime object.
+
+[float]
+===== Arguments
+
+seconds (optional)::
+
+Seconds.
+
+// function_arg_footer: seconds (optional)
+nseconds (optional)::
+
+Nanoseconds.
+
+// function_arg_footer: nseconds (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The new NSTime object.
+
+// function_returns_footer: nstime:__call
+// function_footer: nstime___call__seconds____nseconds__
+
+// wslua_nstime.c
+[#lua_fn_nstime_tonumber__]
+===== nstime:tonumber()
+
+Returns a Lua number of the `NSTime` representing seconds from epoch.
+
+[float]
+===== Returns
+
+The Lua number.
+
+// function_returns_footer: nstime:tonumber
+// function_footer: nstime_tonumber__
+
+// wslua_nstime.c
+[#lua_fn_nstime___tostring__]
+===== nstime:__tostring()
+
+
+
+[float]
+===== Returns
+
+The string representing the nstime.
+
+// function_returns_footer: nstime:__tostring
+// function_footer: nstime___tostring__
+
+// wslua_nstime.c
+[#lua_fn_nstime___add__]
+===== nstime:__add()
+
+Calculates the sum of two NSTimes.
+
+// function_footer: nstime___add__
+
+// wslua_nstime.c
+[#lua_fn_nstime___sub__]
+===== nstime:__sub()
+
+Calculates the diff of two NSTimes.
+
+// function_footer: nstime___sub__
+
+// wslua_nstime.c
+[#lua_fn_nstime___unm__]
+===== nstime:__unm()
+
+Calculates the negative NSTime.
+
+// function_footer: nstime___unm__
+
+// wslua_nstime.c
+[#lua_fn_nstime___eq__]
+===== nstime:__eq()
+
+Compares two NSTimes.
+
+// function_footer: nstime___eq__
+
+// wslua_nstime.c
+[#lua_fn_nstime___le__]
+===== nstime:__le()
+
+Compares two NSTimes.
+
+// function_footer: nstime___le__
+
+// wslua_nstime.c
+[#lua_fn_nstime___lt__]
+===== nstime:__lt()
+
+Compares two NSTimes.
+
+// function_footer: nstime___lt__
+
+[#lua_class_attrib_nstime_secs]
+===== nstime.secs
+
+Mode: Retrieve or assign.
+
+The NSTime seconds.
+
+// End nstime.secs
+
+[#lua_class_attrib_nstime_nsecs]
+===== nstime.nsecs
+
+Mode: Retrieve or assign.
+
+The NSTime nano seconds.
+
+// End nstime.nsecs
+
+// class_footer: NSTime
+
+// wslua_nstime.c
+[#lua_class_Pinfo]
+==== Pinfo
+
+Packet information.
+
+[#lua_class_attrib_pinfo_visited]
+===== pinfo.visited
+
+Mode: Retrieve only.
+
+Whether this packet has been already visited.
+
+// End pinfo.visited
+
+[#lua_class_attrib_pinfo_number]
+===== pinfo.number
+
+Mode: Retrieve only.
+
+The number of this packet in the current file.
+
+// End pinfo.number
+
+[#lua_class_attrib_pinfo_len]
+===== pinfo.len
+
+Mode: Retrieve only.
+
+The length of the frame.
+
+// End pinfo.len
+
+[#lua_class_attrib_pinfo_caplen]
+===== pinfo.caplen
+
+Mode: Retrieve only.
+
+The captured length of the frame.
+
+// End pinfo.caplen
+
+[#lua_class_attrib_pinfo_abs_ts]
+===== pinfo.abs_ts
+
+Mode: Retrieve only.
+
+When the packet was captured.
+
+// End pinfo.abs_ts
+
+[#lua_class_attrib_pinfo_rel_ts]
+===== pinfo.rel_ts
+
+Mode: Retrieve only.
+
+Number of seconds passed since beginning of capture.
+
+// End pinfo.rel_ts
+
+[#lua_class_attrib_pinfo_delta_ts]
+===== pinfo.delta_ts
+
+Mode: Retrieve only.
+
+Number of seconds passed since the last captured packet.
+
+// End pinfo.delta_ts
+
+[#lua_class_attrib_pinfo_delta_dis_ts]
+===== pinfo.delta_dis_ts
+
+Mode: Retrieve only.
+
+Number of seconds passed since the last displayed packet.
+
+// End pinfo.delta_dis_ts
+
+[#lua_class_attrib_pinfo_curr_proto]
+===== pinfo.curr_proto
+
+Mode: Retrieve only.
+
+Which Protocol are we dissecting.
+
+// End pinfo.curr_proto
+
+[#lua_class_attrib_pinfo_can_desegment]
+===== pinfo.can_desegment
+
+Mode: Retrieve or assign.
+
+Set if this segment could be desegmented.
+
+// End pinfo.can_desegment
+
+[#lua_class_attrib_pinfo_saved_can_desegment]
+===== pinfo.saved_can_desegment
+
+Mode: Retrieve only.
+
+Value of can_desegment before the current dissector was called.
+Supplied so that proxy protocols like SOCKS can restore it to whatever the previous dissector (e.g. TCP) set it,
+so that the dissectors they call are desegmented via the previous dissector.
+Since: 4.3.1
+
+// End pinfo.saved_can_desegment
+
+[#lua_class_attrib_pinfo_desegment_len]
+===== pinfo.desegment_len
+
+Mode: Retrieve or assign.
+
+Estimated number of additional bytes required for completing the PDU.
+
+// End pinfo.desegment_len
+
+[#lua_class_attrib_pinfo_desegment_offset]
+===== pinfo.desegment_offset
+
+Mode: Retrieve or assign.
+
+Offset in the tvbuff at which the dissector will continue processing when next called.
+
+// End pinfo.desegment_offset
+
+[#lua_class_attrib_pinfo_fragmented]
+===== pinfo.fragmented
+
+Mode: Retrieve only.
+
+If the protocol is only a fragment.
+
+// End pinfo.fragmented
+
+[#lua_class_attrib_pinfo_in_error_pkt]
+===== pinfo.in_error_pkt
+
+Mode: Retrieve or assign.
+
+If we're inside an error packet.
+
+// End pinfo.in_error_pkt
+
+[#lua_class_attrib_pinfo_match_uint]
+===== pinfo.match_uint
+
+Mode: Retrieve only.
+
+Matched uint for calling subdissector from table.
+
+// End pinfo.match_uint
+
+[#lua_class_attrib_pinfo_match_string]
+===== pinfo.match_string
+
+Mode: Retrieve only.
+
+Matched string for calling subdissector from table.
+
+// End pinfo.match_string
+
+[#lua_class_attrib_pinfo_port_type]
+===== pinfo.port_type
+
+Mode: Retrieve or assign.
+
+Type of Port of .src_port and .dst_port.
+
+// End pinfo.port_type
+
+[#lua_class_attrib_pinfo_src_port]
+===== pinfo.src_port
+
+Mode: Retrieve or assign.
+
+Source Port of this Packet.
+
+// End pinfo.src_port
+
+[#lua_class_attrib_pinfo_dst_port]
+===== pinfo.dst_port
+
+Mode: Retrieve or assign.
+
+Destination Port of this Packet.
+
+// End pinfo.dst_port
+
+[#lua_class_attrib_pinfo_dl_src]
+===== pinfo.dl_src
+
+Mode: Retrieve or assign.
+
+Data Link Source Address of this Packet.
+
+// End pinfo.dl_src
+
+[#lua_class_attrib_pinfo_dl_dst]
+===== pinfo.dl_dst
+
+Mode: Retrieve or assign.
+
+Data Link Destination Address of this Packet.
+
+// End pinfo.dl_dst
+
+[#lua_class_attrib_pinfo_net_src]
+===== pinfo.net_src
+
+Mode: Retrieve or assign.
+
+Network Layer Source Address of this Packet.
+
+// End pinfo.net_src
+
+[#lua_class_attrib_pinfo_net_dst]
+===== pinfo.net_dst
+
+Mode: Retrieve or assign.
+
+Network Layer Destination Address of this Packet.
+
+// End pinfo.net_dst
+
+[#lua_class_attrib_pinfo_src]
+===== pinfo.src
+
+Mode: Retrieve or assign.
+
+Source Address of this Packet.
+
+// End pinfo.src
+
+[#lua_class_attrib_pinfo_dst]
+===== pinfo.dst
+
+Mode: Retrieve or assign.
+
+Destination Address of this Packet.
+
+// End pinfo.dst
+
+[#lua_class_attrib_pinfo_p2p_dir]
+===== pinfo.p2p_dir
+
+Mode: Retrieve or assign.
+
+Direction of this Packet. (incoming / outgoing)
+
+// End pinfo.p2p_dir
+
+[#lua_class_attrib_pinfo_match]
+===== pinfo.match
+
+Mode: Retrieve only.
+
+Port/Data we are matching.
+
+// End pinfo.match
+
+[#lua_class_attrib_pinfo_columns]
+===== pinfo.columns
+
+Mode: Retrieve only.
+
+Access to the packet list columns.
+
+// End pinfo.columns
+
+[#lua_class_attrib_pinfo_cols]
+===== pinfo.cols
+
+Mode: Retrieve only.
+
+Access to the packet list columns (equivalent to pinfo.columns).
+
+// End pinfo.cols
+
+[#lua_class_attrib_pinfo_private]
+===== pinfo.private
+
+Mode: Retrieve only.
+
+Access to the private table entries.
+
+// End pinfo.private
+
+[#lua_class_attrib_pinfo_hi]
+===== pinfo.hi
+
+Mode: Retrieve or assign.
+
+Higher Address of this Packet.
+
+// End pinfo.hi
+
+[#lua_class_attrib_pinfo_lo]
+===== pinfo.lo
+
+Mode: Retrieve only.
+
+Lower Address of this Packet.
+
+// End pinfo.lo
+
+[#lua_class_attrib_pinfo_conversation]
+===== pinfo.conversation
+
+Mode: Assign only.
+
+Sets the packet conversation to the given Proto object.
+
+// End pinfo.conversation
+
+// class_footer: Pinfo
+
+// wslua_nstime.c
+[#lua_class_PrivateTable]
+==== PrivateTable
+
+PrivateTable represents the pinfo->private_table.
+
+// wslua_pinfo.c
+[#lua_fn_privatetable___tostring__]
+===== privatetable:__tostring()
+
+Gets debugging type information about the private table.
+
+[float]
+===== Returns
+
+A string with all keys in the table, mostly for debugging.
+
+// function_returns_footer: privatetable:__tostring
+// function_footer: privatetable___tostring__
+
+// class_footer: PrivateTable
+// end of module

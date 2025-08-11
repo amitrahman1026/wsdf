@@ -1,0 +1,1694 @@
+// wslua_byte_array.c
+[#lua_module_Tvb]
+=== Functions For Handling Packet Data
+
+// wslua_byte_array.c
+[#lua_class_ByteArray]
+==== ByteArray
+
+// wslua_byte_array.c
+[#lua_fn_ByteArray_new__hexbytes____separator__]
+===== ByteArray.new([hexbytes], [separator])
+
+Creates a new <<lua_class_ByteArray,`ByteArray`>> object.
+
+Starting in version 1.11.3, if the second argument is a boolean `true`,
+then the first argument is treated as a raw Lua string of bytes to use,
+instead of a hexadecimal string.
+
+===== Example
+
+[source,lua]
+----
+    local empty = ByteArray.new()
+    local b1 = ByteArray.new("a1 b2 c3 d4")
+    local b2 = ByteArray.new("112233")
+----
+
+[float]
+===== Arguments
+
+hexbytes (optional)::
+
+A string consisting of hexadecimal bytes like "00 B1 A2" or "1a2b3c4d".
+
+// function_arg_footer: hexbytes (optional)
+separator (optional)::
+
+A string separator between hex bytes/words (default=" "),
+or if the boolean value `true` is used, then the first argument
+is treated as raw binary data
+
+// function_arg_footer: separator (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The new ByteArray object.
+
+// function_returns_footer: ByteArray.new
+// function_footer: ByteArray_new__hexbytes____separator__
+
+// wslua_byte_array.c
+[#lua_fn_bytearray___concat_first__second_]
+===== bytearray:__concat(first, second)
+
+Concatenate two <<lua_class_ByteArray,`ByteArray`>>s.
+
+[float]
+===== Arguments
+
+first::
+
+First array.
+
+// function_arg_footer: first
+second::
+
+Second array.
+
+// function_arg_footer: second
+// end of function_args
+
+[float]
+===== Returns
+
+The new composite <<lua_class_ByteArray,`ByteArray`>>.
+
+// function_returns_footer: bytearray:__concat
+// function_footer: bytearray___concat_first__second_
+
+// wslua_byte_array.c
+[#lua_fn_bytearray___eq_first__second_]
+===== bytearray:__eq(first, second)
+
+Compares two ByteArray values.
+
+[float]
+===== Arguments
+
+first::
+
+First array.
+
+// function_arg_footer: first
+second::
+
+Second array.
+
+// function_arg_footer: second
+// end of function_args
+
+// function_footer: bytearray___eq_first__second_
+
+// wslua_byte_array.c
+[#lua_fn_bytearray_prepend_prepended_]
+===== bytearray:prepend(prepended)
+
+Prepend a <<lua_class_ByteArray,`ByteArray`>> to this <<lua_class_ByteArray,`ByteArray`>>.
+
+[float]
+===== Arguments
+
+prepended::
+
+<<lua_class_ByteArray,`ByteArray`>> to be prepended.
+
+// function_arg_footer: prepended
+// end of function_args
+
+// function_footer: bytearray_prepend_prepended_
+
+// wslua_byte_array.c
+[#lua_fn_bytearray_append_appended_]
+===== bytearray:append(appended)
+
+Append a <<lua_class_ByteArray,`ByteArray`>> to this <<lua_class_ByteArray,`ByteArray`>>.
+
+[float]
+===== Arguments
+
+appended::
+
+<<lua_class_ByteArray,`ByteArray`>> to be appended.
+
+// function_arg_footer: appended
+// end of function_args
+
+// function_footer: bytearray_append_appended_
+
+// wslua_byte_array.c
+[#lua_fn_bytearray_set_size_size_]
+===== bytearray:set_size(size)
+
+Sets the size of a <<lua_class_ByteArray,`ByteArray`>>, either truncating it or filling it with zeros.
+
+[float]
+===== Arguments
+
+size::
+
+New size of the array.
+
+// function_arg_footer: size
+// end of function_args
+
+[float]
+===== Errors
+
+* ByteArray size must be non-negative
+
+// function_errors_footer: bytearray:set_size
+// function_footer: bytearray_set_size_size_
+
+// wslua_byte_array.c
+[#lua_fn_bytearray_set_index_index__value_]
+===== bytearray:set_index(index, value)
+
+Sets the value of an index of a <<lua_class_ByteArray,`ByteArray`>>.
+
+[float]
+===== Arguments
+
+index::
+
+The position of the byte to be set.
+
+// function_arg_footer: index
+value::
+
+The char value to set [0-255].
+
+// function_arg_footer: value
+// end of function_args
+
+// function_footer: bytearray_set_index_index__value_
+
+// wslua_byte_array.c
+[#lua_fn_bytearray_get_index_index_]
+===== bytearray:get_index(index)
+
+Get the value of a byte in a <<lua_class_ByteArray,`ByteArray`>>.
+
+[float]
+===== Arguments
+
+index::
+
+The position of the byte to get.
+
+// function_arg_footer: index
+// end of function_args
+
+[float]
+===== Returns
+
+The value [0-255] of the byte.
+
+// function_returns_footer: bytearray:get_index
+// function_footer: bytearray_get_index_index_
+
+// wslua_byte_array.c
+[#lua_fn_bytearray_le_int__offset____length__]
+===== bytearray:le_int([offset], [length])
+
+Read a little endian encoded signed integer in a <<lua_class_ByteArray,`ByteArray`>> beginning at given offset with given length.
+
+Since: 4.2.0
+
+[float]
+===== Arguments
+
+offset (optional)::
+
+The position of the first byte. Default is 0, or the first byte.
+
+// function_arg_footer: offset (optional)
+length (optional)::
+
+The length of the integer. Default is -1, or the remaining bytes in the <<lua_class_ByteArray,`ByteArray`>>.
+
+// function_arg_footer: length (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The value of the little endian encoded signed integer beginning at given offset with given length.
+
+// function_returns_footer: bytearray:le_int
+// function_footer: bytearray_le_int__offset____length__
+
+// wslua_byte_array.c
+[#lua_fn_bytearray_le_int64__offset____length__]
+===== bytearray:le_int64([offset], [length])
+
+Read a little endian encoded 64 bit signed integer in a <<lua_class_ByteArray,`ByteArray`>> beginning at given offset with given length.
+
+Since: 4.2.0
+
+[float]
+===== Arguments
+
+offset (optional)::
+
+The position of the first byte. Default is 0, or the first byte.
+
+// function_arg_footer: offset (optional)
+length (optional)::
+
+The length of the integer. Default is -1, or the remaining bytes in the <<lua_class_ByteArray,`ByteArray`>>.
+
+// function_arg_footer: length (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The value of the little endian encoded 64 bit signed integer as a <<lua_class_Int64,`Int64`>> object beginning at given offset with given length.
+
+// function_returns_footer: bytearray:le_int64
+// function_footer: bytearray_le_int64__offset____length__
+
+// wslua_byte_array.c
+[#lua_fn_bytearray_le_uint__offset____length__]
+===== bytearray:le_uint([offset], [length])
+
+Read a little endian encoded unsigned integer in a <<lua_class_ByteArray,`ByteArray`>> beginning at given offset with given length.
+
+Since: 4.2.0
+
+[float]
+===== Arguments
+
+offset (optional)::
+
+The position of the first byte. Default is 0, or the first byte.
+
+// function_arg_footer: offset (optional)
+length (optional)::
+
+The length of the integer. Default is -1, or the remaining bytes in the <<lua_class_ByteArray,`ByteArray`>>.
+
+// function_arg_footer: length (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The value of the little endian encoded unsigned integer beginning at given offset with given length.
+
+// function_returns_footer: bytearray:le_uint
+// function_footer: bytearray_le_uint__offset____length__
+
+// wslua_byte_array.c
+[#lua_fn_bytearray_le_uint64__offset____length__]
+===== bytearray:le_uint64([offset], [length])
+
+Read a little endian encoded 64 bit unsigned integer in a <<lua_class_ByteArray,`ByteArray`>> beginning at given offset with given length.
+
+Since: 4.2.0
+
+[float]
+===== Arguments
+
+offset (optional)::
+
+The position of the first byte. Default is 0, or the first byte.
+
+// function_arg_footer: offset (optional)
+length (optional)::
+
+The length of the integer. Default is -1, or the remaining bytes in the <<lua_class_ByteArray,`ByteArray`>>.
+
+// function_arg_footer: length (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The value of the little endian encoded 64 bit unsigned integer as a <<lua_class_UInt64,`UInt64`>> object beginning at given offset with given length.
+
+// function_returns_footer: bytearray:le_uint64
+// function_footer: bytearray_le_uint64__offset____length__
+
+// wslua_byte_array.c
+[#lua_fn_bytearray_int__offset____length__]
+===== bytearray:int([offset], [length])
+
+Read a big endian encoded signed integer in a <<lua_class_ByteArray,`ByteArray`>> beginning at given offset with given length.
+
+Since: 4.2.0
+
+[float]
+===== Arguments
+
+offset (optional)::
+
+The position of the first byte. Default is 0, or the first byte.
+
+// function_arg_footer: offset (optional)
+length (optional)::
+
+The length of the integer. Default is -1, or the remaining bytes in the <<lua_class_ByteArray,`ByteArray`>>.
+
+// function_arg_footer: length (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The value of the big endian encoded 32 bit signed integer beginning at given offset with given length.
+
+// function_returns_footer: bytearray:int
+// function_footer: bytearray_int__offset____length__
+
+// wslua_byte_array.c
+[#lua_fn_bytearray_int64__offset____length__]
+===== bytearray:int64([offset], [length])
+
+Read a big endian encoded 64 bit signed integer in a <<lua_class_ByteArray,`ByteArray`>> beginning at given offset with given length.
+
+Since: 4.2.0
+
+[float]
+===== Arguments
+
+offset (optional)::
+
+The position of the first byte. Default is 0, or the first byte.
+
+// function_arg_footer: offset (optional)
+length (optional)::
+
+The length of the integer. Default is -1, or the remaining bytes in the <<lua_class_ByteArray,`ByteArray`>>.
+
+// function_arg_footer: length (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The value of the big endian encoded 64 bit signed integer as a <<lua_class_Int64,`Int64`>> object beginning at given offset and given length.
+
+// function_returns_footer: bytearray:int64
+// function_footer: bytearray_int64__offset____length__
+
+// wslua_byte_array.c
+[#lua_fn_bytearray_uint__offset____length__]
+===== bytearray:uint([offset], [length])
+
+Read a big endian encoded unsigned integer in a <<lua_class_ByteArray,`ByteArray`>> beginning at given offset with given length.
+
+Since: 4.2.0
+
+[float]
+===== Arguments
+
+offset (optional)::
+
+The position of the first byte. Default is 0, or the first byte.
+
+// function_arg_footer: offset (optional)
+length (optional)::
+
+The length of the integer. Default is -1, or the remaining bytes in the <<lua_class_ByteArray,`ByteArray`>>.
+
+// function_arg_footer: length (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The value of the big endian encoded 32 bit unsigned integer beginning at given offset with given length.
+
+// function_returns_footer: bytearray:uint
+// function_footer: bytearray_uint__offset____length__
+
+// wslua_byte_array.c
+[#lua_fn_bytearray_uint64__offset____length__]
+===== bytearray:uint64([offset], [length])
+
+Read a big endian encoded 64 bit unsigned integer in a <<lua_class_ByteArray,`ByteArray`>> beginning at given offset with given length.
+
+Since: 4.2.0
+
+[float]
+===== Arguments
+
+offset (optional)::
+
+The position of the first byte. Default is 0, or the first byte.
+
+// function_arg_footer: offset (optional)
+length (optional)::
+
+The length of the integer. Default is -1, or the remaining bytes in the <<lua_class_ByteArray,`ByteArray`>>.
+
+// function_arg_footer: length (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The value of the big endian encoded 64 bit unsigned integer as a <<lua_class_UInt64,`UInt64`>> object beginning at given offset with given length.
+
+// function_returns_footer: bytearray:uint64
+// function_footer: bytearray_uint64__offset____length__
+
+// wslua_byte_array.c
+[#lua_fn_bytearray_len__]
+===== bytearray:len()
+
+Obtain the length of a <<lua_class_ByteArray,`ByteArray`>>.
+
+[float]
+===== Returns
+
+The length of the <<lua_class_ByteArray,`ByteArray`>>.
+
+// function_returns_footer: bytearray:len
+// function_footer: bytearray_len__
+
+// wslua_byte_array.c
+[#lua_fn_bytearray_subset_offset__length_]
+===== bytearray:subset(offset, length)
+
+Obtain a segment of a <<lua_class_ByteArray,`ByteArray`>>, as a new <<lua_class_ByteArray,`ByteArray`>>.
+
+[float]
+===== Arguments
+
+offset::
+
+The position of the first byte (0=first).
+
+// function_arg_footer: offset
+length::
+
+The length of the segment.
+
+// function_arg_footer: length
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ByteArray,`ByteArray`>> containing the requested segment.
+
+// function_returns_footer: bytearray:subset
+// function_footer: bytearray_subset_offset__length_
+
+// wslua_byte_array.c
+[#lua_fn_bytearray_base64_decode__]
+===== bytearray:base64_decode()
+
+Obtain a Base64 decoded <<lua_class_ByteArray,`ByteArray`>>.
+
+[float]
+===== Returns
+
+The created <<lua_class_ByteArray,`ByteArray`>>.
+
+// function_returns_footer: bytearray:base64_decode
+// function_footer: bytearray_base64_decode__
+
+// wslua_byte_array.c
+[#lua_fn_bytearray_raw__offset____length__]
+===== bytearray:raw([offset], [length])
+
+Obtain a Lua string of the binary bytes in a <<lua_class_ByteArray,`ByteArray`>>.
+
+[float]
+===== Arguments
+
+offset (optional)::
+
+The position of the first byte (default=0/first).
+
+// function_arg_footer: offset (optional)
+length (optional)::
+
+The length of the segment to get (default=all).
+
+// function_arg_footer: length (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A Lua string of the binary bytes in the ByteArray.
+
+// function_returns_footer: bytearray:raw
+// function_footer: bytearray_raw__offset____length__
+
+// wslua_byte_array.c
+[#lua_fn_bytearray_tohex__lowercase____separator__]
+===== bytearray:tohex([lowercase], [separator])
+
+Obtain a Lua string of the bytes in a <<lua_class_ByteArray,`ByteArray`>> as hex-ascii, with given separator.
+
+[float]
+===== Arguments
+
+lowercase (optional)::
+
+True to use lower-case hex characters (default=false).
+
+// function_arg_footer: lowercase (optional)
+separator (optional)::
+
+A string separator to insert between hex bytes (default=nil).
+
+// function_arg_footer: separator (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A hex-ascii string representation of the <<lua_class_ByteArray,`ByteArray`>>.
+
+// function_returns_footer: bytearray:tohex
+// function_footer: bytearray_tohex__lowercase____separator__
+
+// wslua_byte_array.c
+[#lua_fn_bytearray___tostring__]
+===== bytearray:__tostring()
+
+Obtain a Lua string containing the bytes in a <<lua_class_ByteArray,`ByteArray`>> so that it can be used in
+display filters (e.g. "01FE456789AB").
+
+[float]
+===== Returns
+
+A hex-ascii string representation of the <<lua_class_ByteArray,`ByteArray`>>.
+
+// function_returns_footer: bytearray:__tostring
+// function_footer: bytearray___tostring__
+
+// wslua_byte_array.c
+[#lua_fn_bytearray_tvb_name_]
+===== bytearray:tvb(name)
+
+Creates a new <<lua_class_Tvb,`Tvb`>> from a <<lua_class_ByteArray,`ByteArray`>>.
+The <<lua_class_Tvb,`Tvb`>> will be added to the current frame.
+
+===== Example
+
+[source,lua]
+----
+    function proto_foo.dissector(buf, pinfo, tree)
+            -- Create a new tab named "My Tvb" and add some data to it
+            local b = ByteArray.new("11223344")
+            local tvb = ByteArray.tvb(b, "My Tvb")
+
+            -- Create a tree item that, when clicked, automatically shows the tab we just created
+            tree:add( tvb(1,2), "Foo" )
+    end
+----
+
+[float]
+===== Arguments
+
+name::
+
+The name to be given to the new data source.
+
+// function_arg_footer: name
+// end of function_args
+
+[float]
+===== Returns
+
+The created <<lua_class_Tvb,`Tvb`>>.
+
+// function_returns_footer: bytearray:tvb
+// function_footer: bytearray_tvb_name_
+
+// class_footer: ByteArray
+
+// wslua_byte_array.c
+[#lua_class_Tvb]
+==== Tvb
+
+A <<lua_class_Tvb,`Tvb`>> represents the packet's buffer. It is passed as an argument to listeners and dissectors,
+and can be used to extract information (via <<lua_class_TvbRange,`TvbRange`>>) from the packet's data.
+
+To create a <<lua_class_TvbRange,`TvbRange`>> the <<lua_class_Tvb,`Tvb`>> must be called with offset and length as optional arguments;
+the offset defaults to 0 and the length to `tvb:captured_len()`.
+
+[WARNING]
+====
+Tvbs are usable only by the current listener or dissector call and are destroyed
+as soon as the listener or dissector returns, so references to them are unusable once the function
+has returned.
+====
+
+// wslua_tvb.c
+[#lua_fn_tvb___tostring__]
+===== tvb:__tostring()
+
+Convert the bytes of a <<lua_class_Tvb,`Tvb`>> into a string.
+This is primarily useful for debugging purposes since the string will be truncated if it is too long.
+
+[float]
+===== Returns
+
+The string.
+
+// function_returns_footer: tvb:__tostring
+// function_footer: tvb___tostring__
+
+// wslua_tvb.c
+[#lua_fn_tvb_reported_len__]
+===== tvb:reported_len()
+
+Obtain the reported length (length on the network) of a <<lua_class_Tvb,`Tvb`>>.
+
+[float]
+===== Returns
+
+The reported length of the <<lua_class_Tvb,`Tvb`>>.
+
+// function_returns_footer: tvb:reported_len
+// function_footer: tvb_reported_len__
+
+// wslua_tvb.c
+[#lua_fn_tvb_captured_len__]
+===== tvb:captured_len()
+
+Obtain the captured length (amount saved in the capture process) of a <<lua_class_Tvb,`Tvb`>>.
+
+[float]
+===== Returns
+
+The captured length of the <<lua_class_Tvb,`Tvb`>>.
+
+// function_returns_footer: tvb:captured_len
+// function_footer: tvb_captured_len__
+
+// wslua_tvb.c
+[#lua_fn_tvb_len__]
+===== tvb:len()
+
+Obtain the captured length (amount saved in the capture process) of a <<lua_class_Tvb,`Tvb`>>.
+Same as captured_len; kept only for backwards compatibility
+
+[float]
+===== Returns
+
+The captured length of the <<lua_class_Tvb,`Tvb`>>.
+
+// function_returns_footer: tvb:len
+// function_footer: tvb_len__
+
+// wslua_tvb.c
+[#lua_fn_tvb_reported_length_remaining__offset__]
+===== tvb:reported_length_remaining([offset])
+
+Obtain the reported (not captured) length of packet data to end of a <<lua_class_Tvb,`Tvb`>> or 0 if the
+offset is beyond the end of the <<lua_class_Tvb,`Tvb`>>.
+
+[float]
+===== Arguments
+
+offset (optional)::
+
+The offset (in octets) from the beginning of the <<lua_class_Tvb,`Tvb`>>. Defaults to 0.
+
+// function_arg_footer: offset (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The remaining reported length of the <<lua_class_Tvb,`Tvb`>>.
+
+// function_returns_footer: tvb:reported_length_remaining
+// function_footer: tvb_reported_length_remaining__offset__
+
+// wslua_tvb.c
+[#lua_fn_tvb_bytes__offset____length__]
+===== tvb:bytes([offset], [length])
+
+Obtain a <<lua_class_ByteArray,`ByteArray`>> from a <<lua_class_Tvb,`Tvb`>>.
+
+[float]
+===== Arguments
+
+offset (optional)::
+
+The offset (in octets) from the beginning of the <<lua_class_Tvb,`Tvb`>>. Defaults to 0.
+
+// function_arg_footer: offset (optional)
+length (optional)::
+
+The length (in octets) of the range. Defaults to until the end of the <<lua_class_Tvb,`Tvb`>>.
+
+// function_arg_footer: length (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_ByteArray,`ByteArray`>> object or nil.
+
+// function_returns_footer: tvb:bytes
+// function_footer: tvb_bytes__offset____length__
+
+// wslua_tvb.c
+[#lua_fn_tvb_offset__]
+===== tvb:offset()
+
+Returns the raw offset (from the beginning of the source <<lua_class_Tvb,`Tvb`>>) of a sub <<lua_class_Tvb,`Tvb`>>.
+
+[float]
+===== Returns
+
+The raw offset of the <<lua_class_Tvb,`Tvb`>>.
+
+// function_returns_footer: tvb:offset
+// function_footer: tvb_offset__
+
+// wslua_tvb.c
+[#lua_fn_tvb___call__]
+===== tvb:__call()
+
+Equivalent to tvb:range(...)
+
+// function_footer: tvb___call__
+
+// wslua_tvb.c
+[#lua_fn_tvb_range__offset____length__]
+===== tvb:range([offset], [length])
+
+Creates a <<lua_class_TvbRange,`TvbRange`>> from this <<lua_class_Tvb,`Tvb`>>.
+
+[float]
+===== Arguments
+
+offset (optional)::
+
+The offset (in octets) from the beginning of the <<lua_class_Tvb,`Tvb`>>. Defaults to 0.
+
+// function_arg_footer: offset (optional)
+length (optional)::
+
+The length (in octets) of the range. Defaults to -1, which specifies the remaining bytes in the <<lua_class_Tvb,`Tvb`>>.
+
+// function_arg_footer: length (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The TvbRange
+
+// function_returns_footer: tvb:range
+// function_footer: tvb_range__offset____length__
+
+// wslua_tvb.c
+[#lua_fn_tvb_raw__offset____length__]
+===== tvb:raw([offset], [length])
+
+Obtain a Lua string of the binary bytes in a <<lua_class_Tvb,`Tvb`>>.
+
+[float]
+===== Arguments
+
+offset (optional)::
+
+The position of the first byte. Default is 0, or the first byte.
+
+// function_arg_footer: offset (optional)
+length (optional)::
+
+The length of the segment to get. Default is -1, or the remaining bytes in the <<lua_class_Tvb,`Tvb`>>.
+
+// function_arg_footer: length (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A Lua string of the binary bytes in the <<lua_class_Tvb,`Tvb`>>.
+
+// function_returns_footer: tvb:raw
+// function_footer: tvb_raw__offset____length__
+
+// wslua_tvb.c
+[#lua_fn_tvb___eq__]
+===== tvb:__eq()
+
+Checks whether contents of two <<lua_class_Tvb,`Tvb`>>s are equal.
+
+// function_footer: tvb___eq__
+
+// class_footer: Tvb
+
+// wslua_byte_array.c
+[#lua_class_TvbRange]
+==== TvbRange
+
+A <<lua_class_TvbRange,`TvbRange`>> represents a usable range of a <<lua_class_Tvb,`Tvb`>> and is used to extract data from the <<lua_class_Tvb,`Tvb`>> that generated it.
+
+<<lua_class_TvbRange,`TvbRange`>>s are created by calling a <<lua_class_Tvb,`Tvb`>> (e.g. 'tvb(offset,length)').
+A length of -1, which is the default, means to use the bytes up to the end of the <<lua_class_Tvb,`Tvb`>>.
+If the <<lua_class_TvbRange,`TvbRange`>> span is outside the <<lua_class_Tvb,`Tvb`>>'s range the creation will cause a runtime error.
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_tvb__]
+===== tvbrange:tvb()
+
+Creates a  new <<lua_class_Tvb,`Tvb`>> from a <<lua_class_TvbRange,`TvbRange`>>.
+
+// function_footer: tvbrange_tvb__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_uint__]
+===== tvbrange:uint()
+
+Get a Big Endian (network order) unsigned integer from a <<lua_class_TvbRange,`TvbRange`>>.
+The range must be 1-4 octets long.
+
+[float]
+===== Returns
+
+The unsigned integer value.
+
+// function_returns_footer: tvbrange:uint
+// function_footer: tvbrange_uint__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_le_uint__]
+===== tvbrange:le_uint()
+
+Get a Little Endian unsigned integer from a <<lua_class_TvbRange,`TvbRange`>>.
+The range must be 1-4 octets long.
+
+[float]
+===== Returns
+
+The unsigned integer value
+
+// function_returns_footer: tvbrange:le_uint
+// function_footer: tvbrange_le_uint__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_uint64__]
+===== tvbrange:uint64()
+
+Get a Big Endian (network order) unsigned 64 bit integer from a <<lua_class_TvbRange,`TvbRange`>>, as a <<lua_class_UInt64,`UInt64`>> object.
+The range must be 1-8 octets long.
+
+[float]
+===== Returns
+
+The <<lua_class_UInt64,`UInt64`>> object.
+
+// function_returns_footer: tvbrange:uint64
+// function_footer: tvbrange_uint64__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_le_uint64__]
+===== tvbrange:le_uint64()
+
+Get a Little Endian unsigned 64 bit integer from a <<lua_class_TvbRange,`TvbRange`>>, as a <<lua_class_UInt64,`UInt64`>> object.
+The range must be 1-8 octets long.
+
+[float]
+===== Returns
+
+The <<lua_class_UInt64,`UInt64`>> object.
+
+// function_returns_footer: tvbrange:le_uint64
+// function_footer: tvbrange_le_uint64__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_int__]
+===== tvbrange:int()
+
+Get a Big Endian (network order) signed integer from a <<lua_class_TvbRange,`TvbRange`>>.
+The range must be 1-4 octets long.
+
+[float]
+===== Returns
+
+The signed integer value.
+
+// function_returns_footer: tvbrange:int
+// function_footer: tvbrange_int__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_le_int__]
+===== tvbrange:le_int()
+
+Get a Little Endian signed integer from a <<lua_class_TvbRange,`TvbRange`>>.
+The range must be 1-4 octets long.
+
+[float]
+===== Returns
+
+The signed integer value.
+
+// function_returns_footer: tvbrange:le_int
+// function_footer: tvbrange_le_int__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_int64__]
+===== tvbrange:int64()
+
+Get a Big Endian (network order) signed 64 bit integer from a <<lua_class_TvbRange,`TvbRange`>>, as an <<lua_class_Int64,`Int64`>> object.
+The range must be 1-8 octets long.
+
+[float]
+===== Returns
+
+The <<lua_class_Int64,`Int64`>> object.
+
+// function_returns_footer: tvbrange:int64
+// function_footer: tvbrange_int64__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_le_int64__]
+===== tvbrange:le_int64()
+
+Get a Little Endian signed 64 bit integer from a <<lua_class_TvbRange,`TvbRange`>>, as an <<lua_class_Int64,`Int64`>> object.
+The range must be 1-8 octets long.
+
+[float]
+===== Returns
+
+The <<lua_class_Int64,`Int64`>> object.
+
+// function_returns_footer: tvbrange:le_int64
+// function_footer: tvbrange_le_int64__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_float__]
+===== tvbrange:float()
+
+Get a Big Endian (network order) floating point number from a <<lua_class_TvbRange,`TvbRange`>>.
+The range must be 4 or 8 octets long.
+
+[float]
+===== Returns
+
+The floating point value.
+
+// function_returns_footer: tvbrange:float
+// function_footer: tvbrange_float__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_le_float__]
+===== tvbrange:le_float()
+
+Get a Little Endian floating point number from a <<lua_class_TvbRange,`TvbRange`>>.
+The range must be 4 or 8 octets long.
+
+[float]
+===== Returns
+
+The floating point value.
+
+// function_returns_footer: tvbrange:le_float
+// function_footer: tvbrange_le_float__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_ipv4__]
+===== tvbrange:ipv4()
+
+Get an IPv4 Address from a <<lua_class_TvbRange,`TvbRange`>>, as an <<lua_class_Address,`Address`>> object.
+
+[float]
+===== Returns
+
+The IPv4 <<lua_class_Address,`Address`>> object.
+
+// function_returns_footer: tvbrange:ipv4
+// function_footer: tvbrange_ipv4__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_le_ipv4__]
+===== tvbrange:le_ipv4()
+
+Get an Little Endian IPv4 Address from a <<lua_class_TvbRange,`TvbRange`>>, as an <<lua_class_Address,`Address`>> object.
+
+[float]
+===== Returns
+
+The IPv4 <<lua_class_Address,`Address`>> object.
+
+// function_returns_footer: tvbrange:le_ipv4
+// function_footer: tvbrange_le_ipv4__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_ipv6__]
+===== tvbrange:ipv6()
+
+Get an IPv6 Address from a <<lua_class_TvbRange,`TvbRange`>>, as an <<lua_class_Address,`Address`>> object.
+
+[float]
+===== Returns
+
+The IPv6 <<lua_class_Address,`Address`>> object.
+
+// function_returns_footer: tvbrange:ipv6
+// function_footer: tvbrange_ipv6__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_ether__]
+===== tvbrange:ether()
+
+Get an Ethernet Address from a <<lua_class_TvbRange,`TvbRange`>>, as an <<lua_class_Address,`Address`>> object.
+
+[float]
+===== Returns
+
+The Ethernet <<lua_class_Address,`Address`>> object.
+
+// function_returns_footer: tvbrange:ether
+[float]
+===== Errors
+
+* The range must be 6 bytes long
+
+// function_errors_footer: tvbrange:ether
+// function_footer: tvbrange_ether__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_nstime__encoding__]
+===== tvbrange:nstime([encoding])
+
+Obtain a time_t structure from a <<lua_class_TvbRange,`TvbRange`>>, as an <<lua_class_NSTime,`NSTime`>> object.
+
+[float]
+===== Arguments
+
+encoding (optional)::
+
+An optional ENC_* encoding value to use
+
+// function_arg_footer: encoding (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_NSTime,`NSTime`>> object and number of bytes used, or nil on failure.
+
+// function_returns_footer: tvbrange:nstime
+[float]
+===== Errors
+
+* The range must be 4 or 8 bytes long
+
+// function_errors_footer: tvbrange:nstime
+// function_footer: tvbrange_nstime__encoding__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_le_nstime__]
+===== tvbrange:le_nstime()
+
+Obtain a nstime from a <<lua_class_TvbRange,`TvbRange`>>, as an <<lua_class_NSTime,`NSTime`>> object.
+
+[float]
+===== Returns
+
+The <<lua_class_NSTime,`NSTime`>> object.
+
+// function_returns_footer: tvbrange:le_nstime
+[float]
+===== Errors
+
+* The range must be 4 or 8 bytes long
+
+// function_errors_footer: tvbrange:le_nstime
+// function_footer: tvbrange_le_nstime__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_string__encoding__]
+===== tvbrange:string([encoding])
+
+Obtain a string from a <<lua_class_TvbRange,`TvbRange`>>.
+
+[float]
+===== Arguments
+
+encoding (optional)::
+
+The encoding to use. Defaults to ENC_ASCII.
+
+// function_arg_footer: encoding (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A string containing all bytes in the <<lua_class_TvbRange,`TvbRange`>> including all zeroes (e.g., "a\000bc\000").
+
+// function_returns_footer: tvbrange:string
+// function_footer: tvbrange_string__encoding__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_ustring__]
+===== tvbrange:ustring()
+
+Obtain a Big Endian (network order) UTF-16 encoded string from a <<lua_class_TvbRange,`TvbRange`>>.
+
+[float]
+===== Returns
+
+A string containing all bytes in the <<lua_class_TvbRange,`TvbRange`>> including all zeroes (e.g., "a\000bc\000").
+
+// function_returns_footer: tvbrange:ustring
+// function_footer: tvbrange_ustring__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_le_ustring__]
+===== tvbrange:le_ustring()
+
+Obtain a Little Endian UTF-16 encoded string from a <<lua_class_TvbRange,`TvbRange`>>.
+
+[float]
+===== Returns
+
+A string containing all bytes in the <<lua_class_TvbRange,`TvbRange`>> including all zeroes (e.g., "a\000bc\000").
+
+// function_returns_footer: tvbrange:le_ustring
+// function_footer: tvbrange_le_ustring__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_stringz__encoding__]
+===== tvbrange:stringz([encoding])
+
+Obtain a zero terminated string from a <<lua_class_TvbRange,`TvbRange`>>.
+
+[float]
+===== Arguments
+
+encoding (optional)::
+
+The encoding to use. Defaults to ENC_ASCII.
+
+// function_arg_footer: encoding (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The string containing all bytes in the <<lua_class_TvbRange,`TvbRange`>> up to the first terminating zero.
+
+// function_returns_footer: tvbrange:stringz
+// function_footer: tvbrange_stringz__encoding__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_strsize__encoding__]
+===== tvbrange:strsize([encoding])
+
+Find the size of a zero terminated string from a <<lua_class_TvbRange,`TvbRange`>>.
+The size of the string includes the terminating zero.
+
+[float]
+===== Arguments
+
+encoding (optional)::
+
+The encoding to use. Defaults to ENC_ASCII.
+
+// function_arg_footer: encoding (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+Length of the zero terminated string.
+
+// function_returns_footer: tvbrange:strsize
+// function_footer: tvbrange_strsize__encoding__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_ustringz__]
+===== tvbrange:ustringz()
+
+Obtain a Big Endian (network order) UTF-16 encoded zero terminated string from a <<lua_class_TvbRange,`TvbRange`>>.
+
+[float]
+===== Returns
+
+Two return values: the zero terminated string, and the length.
+
+// function_returns_footer: tvbrange:ustringz
+// function_footer: tvbrange_ustringz__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_le_ustringz__]
+===== tvbrange:le_ustringz()
+
+Obtain a Little Endian UTF-16 encoded zero terminated string from a TvbRange
+
+[float]
+===== Returns
+
+Two return values: the zero terminated string, and the length.
+
+// function_returns_footer: tvbrange:le_ustringz
+// function_footer: tvbrange_le_ustringz__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_bytes__encoding__]
+===== tvbrange:bytes([encoding])
+
+Obtain a <<lua_class_ByteArray,`ByteArray`>> from a <<lua_class_TvbRange,`TvbRange`>>.
+
+Starting in 1.11.4, this function also takes an optional `encoding` argument,
+which can be set to `ENC_STR_HEX` to decode a hex-string from the <<lua_class_TvbRange,`TvbRange`>>
+into the returned <<lua_class_ByteArray,`ByteArray`>>. The `encoding` can be bitwise-or'ed with one
+or more separator encodings, such as `ENC_SEP_COLON`, to allow separators
+to occur between each pair of hex characters.
+
+The return value also now returns the number of bytes used as a second return value.
+
+On failure or error, nil is returned for both return values.
+
+[NOTE]
+====
+The encoding type of the hex string should also be set, for example
+`ENC_ASCII` or `ENC_UTF_8`, along with `ENC_STR_HEX`.
+====
+
+[float]
+===== Arguments
+
+encoding (optional)::
+
+An optional ENC_* encoding value to use
+
+// function_arg_footer: encoding (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_ByteArray,`ByteArray`>> object or nil, and number of bytes consumed or nil.
+
+// function_returns_footer: tvbrange:bytes
+// function_footer: tvbrange_bytes__encoding__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_bitfield__position____length__]
+===== tvbrange:bitfield([position], [length])
+
+Get a bitfield from a <<lua_class_TvbRange,`TvbRange`>>.
+
+[float]
+===== Arguments
+
+position (optional)::
+
+The bit offset (link:https://en.wikipedia.org/wiki/Bit_numbering#MSB_0_bit_numbering[MSB 0 bit numbering]) from the beginning of the <<lua_class_TvbRange,`TvbRange`>>. Defaults to 0.
+
+// function_arg_footer: position (optional)
+length (optional)::
+
+The length in bits of the field. Defaults to 1.
+
+// function_arg_footer: length (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The bitfield value
+
+// function_returns_footer: tvbrange:bitfield
+// function_footer: tvbrange_bitfield__position____length__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_range__offset____length__]
+===== tvbrange:range([offset], [length])
+
+Creates a sub-<<lua_class_TvbRange,`TvbRange`>> from this <<lua_class_TvbRange,`TvbRange`>>.
+
+[float]
+===== Arguments
+
+offset (optional)::
+
+The offset (in octets) from the beginning of the <<lua_class_TvbRange,`TvbRange`>>. Defaults to 0.
+
+// function_arg_footer: offset (optional)
+length (optional)::
+
+The length (in octets) of the range. Defaults to until the end of the <<lua_class_TvbRange,`TvbRange`>>.
+
+// function_arg_footer: length (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_TvbRange,`TvbRange`>>.
+
+// function_returns_footer: tvbrange:range
+// function_footer: tvbrange_range__offset____length__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_uncompress_zlib_name_]
+===== tvbrange:uncompress_zlib(name)
+
+Given a <<lua_class_TvbRange,`TvbRange`>> containing zlib compressed data, decompresses the data and returns a new <<lua_class_TvbRange,`TvbRange`>> containing the uncompressed data.
+Since: 4.3.0
+
+[float]
+===== Arguments
+
+name::
+
+The name to be given to the new data-source.
+
+// function_arg_footer: name
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_TvbRange,`TvbRange`>>.
+
+// function_returns_footer: tvbrange:uncompress_zlib
+// function_footer: tvbrange_uncompress_zlib_name_
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_uncompress_name_]
+===== tvbrange:uncompress(name)
+
+Given a <<lua_class_TvbRange,`TvbRange`>> containing zlib compressed data, decompresses the data and returns a new <<lua_class_TvbRange,`TvbRange`>> containing the uncompressed data. Deprecated; use tvbrange:uncompress_zlib() instead.
+
+[float]
+===== Arguments
+
+name::
+
+The name to be given to the new data-source.
+
+// function_arg_footer: name
+// end of function_args
+
+// function_footer: tvbrange_uncompress_name_
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_uncompress_brotli_name_]
+===== tvbrange:uncompress_brotli(name)
+
+Given a <<lua_class_TvbRange,`TvbRange`>> containing Brotli compressed data, decompresses the data and returns a new <<lua_class_TvbRange,`TvbRange`>> containing the uncompressed data.
+Since: 4.3.0
+
+[float]
+===== Arguments
+
+name::
+
+The name to be given to the new data-source.
+
+// function_arg_footer: name
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_TvbRange,`TvbRange`>>.
+
+// function_returns_footer: tvbrange:uncompress_brotli
+// function_footer: tvbrange_uncompress_brotli_name_
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_uncompress_hpack_huff_name_]
+===== tvbrange:uncompress_hpack_huff(name)
+
+Given a <<lua_class_TvbRange,`TvbRange`>> containing data compressed using the Huffman encoding in HTTP/2 HPACK and HTTP/3 QPACK, decompresses the data and returns a new <<lua_class_TvbRange,`TvbRange`>> containing the uncompressed data.
+Since: 4.3.0
+
+[float]
+===== Arguments
+
+name::
+
+The name to be given to the new data-source.
+
+// function_arg_footer: name
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_TvbRange,`TvbRange`>>.
+
+// function_returns_footer: tvbrange:uncompress_hpack_huff
+// function_footer: tvbrange_uncompress_hpack_huff_name_
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_uncompress_lz77_name_]
+===== tvbrange:uncompress_lz77(name)
+
+Given a <<lua_class_TvbRange,`TvbRange`>> containing Microsoft Plain LZ77 compressed data, decompresses the data and returns a new <<lua_class_TvbRange,`TvbRange`>> containing the uncompressed data.
+Since: 4.3.0
+
+[float]
+===== Arguments
+
+name::
+
+The name to be given to the new data-source.
+
+// function_arg_footer: name
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_TvbRange,`TvbRange`>>.
+
+// function_returns_footer: tvbrange:uncompress_lz77
+// function_footer: tvbrange_uncompress_lz77_name_
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_uncompress_lz77huff_name_]
+===== tvbrange:uncompress_lz77huff(name)
+
+Given a <<lua_class_TvbRange,`TvbRange`>> containing Microsoft LZ77+Huffman compressed data, decompresses the data and returns a new <<lua_class_TvbRange,`TvbRange`>> containing the uncompressed data.
+Since: 4.3.0
+
+[float]
+===== Arguments
+
+name::
+
+The name to be given to the new data-source.
+
+// function_arg_footer: name
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_TvbRange,`TvbRange`>>.
+
+// function_returns_footer: tvbrange:uncompress_lz77huff
+// function_footer: tvbrange_uncompress_lz77huff_name_
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_uncompress_lznt1_name_]
+===== tvbrange:uncompress_lznt1(name)
+
+Given a <<lua_class_TvbRange,`TvbRange`>> containing Microsoft LZNT1 compressed data, decompresses the data and returns a new <<lua_class_TvbRange,`TvbRange`>> containing the uncompressed data.
+Since: 4.3.0
+
+[float]
+===== Arguments
+
+name::
+
+The name to be given to the new data-source.
+
+// function_arg_footer: name
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_TvbRange,`TvbRange`>>.
+
+// function_returns_footer: tvbrange:uncompress_lznt1
+// function_footer: tvbrange_uncompress_lznt1_name_
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_uncompress_snappy_name_]
+===== tvbrange:uncompress_snappy(name)
+
+Given a <<lua_class_TvbRange,`TvbRange`>> containing Snappy compressed data, decompresses the data and returns a new <<lua_class_TvbRange,`TvbRange`>> containing the uncompressed data.
+Since: 4.3.0
+
+[float]
+===== Arguments
+
+name::
+
+The name to be given to the new data-source.
+
+// function_arg_footer: name
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_TvbRange,`TvbRange`>>.
+
+// function_returns_footer: tvbrange:uncompress_snappy
+// function_footer: tvbrange_uncompress_snappy_name_
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_uncompress_zstd_name_]
+===== tvbrange:uncompress_zstd(name)
+
+Given a <<lua_class_TvbRange,`TvbRange`>> containing Zstandard compressed data, decompresses the data and returns a new <<lua_class_TvbRange,`TvbRange`>> containing the uncompressed data.
+Since: 4.3.0
+
+[float]
+===== Arguments
+
+name::
+
+The name to be given to the new data-source.
+
+// function_arg_footer: name
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_TvbRange,`TvbRange`>>.
+
+// function_returns_footer: tvbrange:uncompress_zstd
+// function_footer: tvbrange_uncompress_zstd_name_
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_decode_base64_name_]
+===== tvbrange:decode_base64(name)
+
+Given a <<lua_class_TvbRange,`TvbRange`>> containing Base64 encoded data, return a new <<lua_class_TvbRange,`TvbRange`>> containing the decoded data.
+Since: 4.3.0
+
+[float]
+===== Arguments
+
+name::
+
+The name to be given to the new data-source.
+
+// function_arg_footer: name
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_TvbRange,`TvbRange`>>.
+
+// function_returns_footer: tvbrange:decode_base64
+// function_footer: tvbrange_decode_base64_name_
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_decode_base64url_name_]
+===== tvbrange:decode_base64url(name)
+
+Given a <<lua_class_TvbRange,`TvbRange`>> containing base64url encoded data, return a new <<lua_class_TvbRange,`TvbRange`>> containing the decoded data.
+Since: 4.3.0
+
+[float]
+===== Arguments
+
+name::
+
+The name to be given to the new data-source.
+
+// function_arg_footer: name
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_TvbRange,`TvbRange`>>.
+
+// function_returns_footer: tvbrange:decode_base64url
+// function_footer: tvbrange_decode_base64url_name_
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_len__]
+===== tvbrange:len()
+
+Obtain the length of a <<lua_class_TvbRange,`TvbRange`>>.
+
+// function_footer: tvbrange_len__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_offset__]
+===== tvbrange:offset()
+
+Obtain the offset in a <<lua_class_TvbRange,`TvbRange`>>.
+
+// function_footer: tvbrange_offset__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange_raw__offset____length__]
+===== tvbrange:raw([offset], [length])
+
+Obtain a Lua string of the binary bytes in a <<lua_class_TvbRange,`TvbRange`>>.
+
+[float]
+===== Arguments
+
+offset (optional)::
+
+The position of the first byte within the range. Default is 0, or first byte.
+
+// function_arg_footer: offset (optional)
+length (optional)::
+
+The length of the segment to get. Default is -1, or the remaining bytes in the range.
+
+// function_arg_footer: length (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A Lua string of the binary bytes in the <<lua_class_TvbRange,`TvbRange`>>.
+
+// function_returns_footer: tvbrange:raw
+// function_footer: tvbrange_raw__offset____length__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange___eq__]
+===== tvbrange:__eq()
+
+Checks whether the contents of two <<lua_class_TvbRange,`TvbRange`>>s are equal.
+
+// function_footer: tvbrange___eq__
+
+// wslua_tvb.c
+[#lua_fn_tvbrange___tostring__]
+===== tvbrange:__tostring()
+
+Converts the <<lua_class_TvbRange,`TvbRange`>> into a string.
+The string can be truncated, so this is primarily useful for debugging or in cases where truncation is preferred, e.g. "67:89:AB:...".
+
+[float]
+===== Returns
+
+A Lua hex string of the <<lua_class_TvbRange,`TvbRange`>> truncated to 24 bytes.
+
+// function_returns_footer: tvbrange:__tostring
+// function_footer: tvbrange___tostring__
+
+// class_footer: TvbRange
+// end of module

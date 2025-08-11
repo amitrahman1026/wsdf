@@ -1,0 +1,2644 @@
+// wslua_proto_field.c
+[#lua_module_Proto]
+=== Functions For New Protocols And Dissectors
+
+The classes and functions in this chapter allow Lua scripts to create new protocols for Wireshark.
+<<lua_class_Proto,`Proto`>> protocol objects can have <<lua_class_Pref,`Pref`>> preferences, <<lua_class_ProtoField,`ProtoField`>> fields for filterable values that can be displayed in a details view tree, functions for dissecting the new protocol, and so on.
+
+The dissection function can be hooked into existing protocol tables through <<lua_class_DissectorTable,`DissectorTable`>> so that the new protocol dissector function gets called by that protocol, and the new dissector can itself call on other, already existing protocol dissectors by retrieving and calling the <<lua_class_Dissector,`Dissector`>> object.
+A <<lua_class_Proto,`Proto`>> dissector can also be used as a post-dissector, at the end of every frame's dissection, or as a heuristic dissector.
+
+// wslua_proto_field.c
+[#lua_class_Dissector]
+==== Dissector
+
+A refererence to a dissector, used to call a dissector against a packet or a part of it.
+
+// wslua_dissector.c
+[#lua_fn_Dissector_get_name_]
+===== Dissector.get(name)
+
+Obtains a dissector reference by name.
+
+[float]
+===== Arguments
+
+name::
+
+The name of the dissector.
+
+// function_arg_footer: name
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_Dissector,`Dissector`>> reference if found, otherwise `nil`.
+
+// function_returns_footer: Dissector.get
+// function_footer: Dissector_get_name_
+
+// wslua_dissector.c
+[#lua_fn_Dissector_list__]
+===== Dissector.list()
+
+Gets a Lua array table of all registered Dissector names.
+
+Note: This is an expensive operation, and should only be used for troubleshooting.
+
+[float]
+===== Returns
+
+The array table of registered dissector names.
+
+// function_returns_footer: Dissector.list
+// function_footer: Dissector_list__
+
+// wslua_dissector.c
+[#lua_fn_dissector_call_tvb__pinfo__tree_]
+===== dissector:call(tvb, pinfo, tree)
+
+Calls a dissector against a given packet (or part of it).
+
+[float]
+===== Arguments
+
+tvb::
+
+The buffer to dissect.
+
+// function_arg_footer: tvb
+pinfo::
+
+The packet info.
+
+// function_arg_footer: pinfo
+tree::
+
+The tree on which to add the protocol items.
+
+// function_arg_footer: tree
+// end of function_args
+
+[float]
+===== Returns
+
+Number of bytes dissected.  Note that some dissectors always return number of bytes in incoming buffer, so be aware.
+
+// function_returns_footer: dissector:call
+// function_footer: dissector_call_tvb__pinfo__tree_
+
+// wslua_dissector.c
+[#lua_fn_dissector___call_tvb__pinfo__tree_]
+===== dissector:__call(tvb, pinfo, tree)
+
+Calls a dissector against a given packet (or part of it).
+
+[float]
+===== Arguments
+
+tvb::
+
+The buffer to dissect.
+
+// function_arg_footer: tvb
+pinfo::
+
+The packet info.
+
+// function_arg_footer: pinfo
+tree::
+
+The tree on which to add the protocol items.
+
+// function_arg_footer: tree
+// end of function_args
+
+// function_footer: dissector___call_tvb__pinfo__tree_
+
+// wslua_dissector.c
+[#lua_fn_dissector___tostring__]
+===== dissector:__tostring()
+
+Gets the Dissector's description.
+
+[float]
+===== Returns
+
+A string of the Dissector's description.
+
+// function_returns_footer: dissector:__tostring
+// function_footer: dissector___tostring__
+
+// class_footer: Dissector
+
+// wslua_proto_field.c
+[#lua_class_DissectorTable]
+==== DissectorTable
+
+A table of subdissectors of a particular protocol (e.g. TCP subdissectors like http, smtp, sip are added to table "tcp.port").
+
+Useful to add more dissectors to a table so that they appear in the “Decode As...” dialog.
+
+// wslua_dissector.c
+[#lua_fn_DissectorTable_new_tablename___uiname____type____base____proto__]
+===== DissectorTable.new(tablename, [uiname], [type], [base], [proto])
+
+Creates a new `DissectorTable` for your dissector's use.
+
+[float]
+===== Arguments
+
+tablename::
+
+The short name of the table. Use lower-case alphanumeric, dot, and/or underscores (e.g., "ansi_map.tele_id" or "udp.port").
+
+// function_arg_footer: tablename
+uiname (optional)::
+
+The name of the table in the user interface.
+Defaults to the name given in `tablename`, but can be any string.
+
+// function_arg_footer: uiname (optional)
+type (optional)::
+
+One of `ftypes.UINT8`, `ftypes.UINT16`,
+`ftypes.UINT24`, `ftypes.UINT32`,
+`ftypes.STRING`, `ftypes.NONE`,
+or `ftypes.GUID`.
+Defaults to `ftypes.UINT32`.
+
+// function_arg_footer: type (optional)
+base (optional)::
+
+One of `base.NONE`, `base.DEC`, `base.HEX`,
+`base.OCT`, `base.DEC_HEX` or `base.HEX_DEC`.
+Defaults to `base.DEC`.
+
+// function_arg_footer: base (optional)
+proto (optional)::
+
+The <<lua_class_Proto,`Proto`>> object that uses this dissector table.
+
+// function_arg_footer: proto (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The newly created DissectorTable.
+
+// function_returns_footer: DissectorTable.new
+// function_footer: DissectorTable_new_tablename___uiname____type____base____proto__
+
+// wslua_dissector.c
+[#lua_fn_DissectorTable_heuristic_new_tablename___uiname___proto_]
+===== DissectorTable.heuristic_new(tablename, [uiname], proto)
+
+Creates a new heuristic `DissectorTable` for your dissector's use. Returns true if table was created successfully.
+
+* XXX - Currently it always returns nil.
+
+Since: 4.2.0
+
+[float]
+===== Arguments
+
+tablename::
+
+The short name of the table. Use lower-case alphanumeric, dot, and/or underscores.
+
+// function_arg_footer: tablename
+uiname (optional)::
+
+The name of the table in the user interface.
+Defaults to the name given in `tablename`, but can be any string.
+
+// function_arg_footer: uiname (optional)
+proto::
+
+The <<lua_class_Proto,`Proto`>> object that uses this dissector table.
+
+// function_arg_footer: proto
+// end of function_args
+
+[float]
+===== Returns
+
+The newly created DissectorTable.
+
+// function_returns_footer: DissectorTable.heuristic_new
+// function_footer: DissectorTable_heuristic_new_tablename___uiname___proto_
+
+// wslua_dissector.c
+[#lua_fn_DissectorTable_list__]
+===== DissectorTable.list()
+
+Gets a Lua array table of all DissectorTable names - i.e., the string names you can
+use for the first argument to DissectorTable.get().
+
+Note: This is an expensive operation, and should only be used for troubleshooting.
+
+[float]
+===== Returns
+
+The array table of registered DissectorTable names.
+
+// function_returns_footer: DissectorTable.list
+// function_footer: DissectorTable_list__
+
+// wslua_dissector.c
+[#lua_fn_DissectorTable_heuristic_list__]
+===== DissectorTable.heuristic_list()
+
+Gets a Lua array table of all heuristic list names - i.e., the string names you can
+use for the first argument in Proto:register_heuristic().
+
+Note: This is an expensive operation, and should only be used for troubleshooting.
+
+[float]
+===== Returns
+
+The array table of registered heuristic list names
+
+// function_returns_footer: DissectorTable.heuristic_list
+// function_footer: DissectorTable_heuristic_list__
+
+// wslua_dissector.c
+[#lua_fn_DissectorTable_try_heuristics_listname__tvb__pinfo__tree_]
+===== DissectorTable.try_heuristics(listname, tvb, pinfo, tree)
+
+Try all the dissectors in a given heuristic dissector table.
+
+[float]
+===== Arguments
+
+listname::
+
+The name of the heuristic dissector.
+
+// function_arg_footer: listname
+tvb::
+
+The buffer to dissect.
+
+// function_arg_footer: tvb
+pinfo::
+
+The packet info.
+
+// function_arg_footer: pinfo
+tree::
+
+The tree on which to add the protocol items.
+
+// function_arg_footer: tree
+// end of function_args
+
+[float]
+===== Returns
+
+True if the packet was recognized by the sub-dissector (stop dissection here).
+
+// function_returns_footer: DissectorTable.try_heuristics
+// function_footer: DissectorTable_try_heuristics_listname__tvb__pinfo__tree_
+
+// wslua_dissector.c
+[#lua_fn_DissectorTable_get_tablename_]
+===== DissectorTable.get(tablename)
+
+Obtain a reference to an existing dissector table.
+
+[float]
+===== Arguments
+
+tablename::
+
+The short name of the table.
+
+// function_arg_footer: tablename
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_DissectorTable,`DissectorTable`>> reference if found, otherwise `nil`.
+
+// function_returns_footer: DissectorTable.get
+// function_footer: DissectorTable_get_tablename_
+
+// wslua_dissector.c
+[#lua_fn_dissectortable_add_pattern__dissector_]
+===== dissectortable:add(pattern, dissector)
+
+Add a <<lua_class_Proto,`Proto`>> with a dissector function or a <<lua_class_Dissector,`Dissector`>> object to the dissector table.
+
+[float]
+===== Arguments
+
+pattern::
+
+The pattern to match (either an integer, a
+integer range or a string depending on the table's type).
+
+// function_arg_footer: pattern
+dissector::
+
+The dissector to add (either a <<lua_class_Proto,`Proto`>> or a <<lua_class_Dissector,`Dissector`>>).
+
+// function_arg_footer: dissector
+// end of function_args
+
+// function_footer: dissectortable_add_pattern__dissector_
+
+// wslua_dissector.c
+[#lua_fn_dissectortable_set_pattern__dissector_]
+===== dissectortable:set(pattern, dissector)
+
+Clear all existing dissectors from a table and add a new dissector or a range of new dissectors.
+
+[float]
+===== Arguments
+
+pattern::
+
+The pattern to match (either an integer, a integer range or a string depending on the table's type).
+
+// function_arg_footer: pattern
+dissector::
+
+The dissector to add (either a <<lua_class_Proto,`Proto`>> or a <<lua_class_Dissector,`Dissector`>>).
+
+// function_arg_footer: dissector
+// end of function_args
+
+// function_footer: dissectortable_set_pattern__dissector_
+
+// wslua_dissector.c
+[#lua_fn_dissectortable_remove_pattern__dissector_]
+===== dissectortable:remove(pattern, dissector)
+
+Remove a dissector or a range of dissectors from a table.
+
+[float]
+===== Arguments
+
+pattern::
+
+The pattern to match (either an integer, a integer range or a string depending on the table's type).
+
+// function_arg_footer: pattern
+dissector::
+
+The dissector to remove (either a <<lua_class_Proto,`Proto`>> or a <<lua_class_Dissector,`Dissector`>>).
+
+// function_arg_footer: dissector
+// end of function_args
+
+// function_footer: dissectortable_remove_pattern__dissector_
+
+// wslua_dissector.c
+[#lua_fn_dissectortable_remove_all_dissector_]
+===== dissectortable:remove_all(dissector)
+
+Remove all dissectors from a table.
+
+[float]
+===== Arguments
+
+dissector::
+
+The dissector to remove (either a <<lua_class_Proto,`Proto`>> or a <<lua_class_Dissector,`Dissector`>>).
+
+// function_arg_footer: dissector
+// end of function_args
+
+// function_footer: dissectortable_remove_all_dissector_
+
+// wslua_dissector.c
+[#lua_fn_dissectortable_try_pattern__tvb__pinfo__tree_]
+===== dissectortable:try(pattern, tvb, pinfo, tree)
+
+Try to call a dissector from a table.
+
+[float]
+===== Arguments
+
+pattern::
+
+The pattern to be matched (either an integer or a string depending on the table's type).
+
+// function_arg_footer: pattern
+tvb::
+
+The <<lua_class_Tvb,`Tvb`>> to dissect.
+
+// function_arg_footer: tvb
+pinfo::
+
+The packet's <<lua_class_Pinfo,`Pinfo`>>.
+
+// function_arg_footer: pinfo
+tree::
+
+The <<lua_class_TreeItem,`TreeItem`>> on which to add the protocol items.
+
+// function_arg_footer: tree
+// end of function_args
+
+[float]
+===== Returns
+
+Number of bytes dissected.  Note that some dissectors always return number of bytes in incoming buffer, so be aware.
+
+// function_returns_footer: dissectortable:try
+// function_footer: dissectortable_try_pattern__tvb__pinfo__tree_
+
+// wslua_dissector.c
+[#lua_fn_dissectortable_get_dissector_pattern_]
+===== dissectortable:get_dissector(pattern)
+
+Try to obtain a dissector from a table.
+
+[float]
+===== Arguments
+
+pattern::
+
+The pattern to be matched (either an integer or a string depending on the table's type).
+
+// function_arg_footer: pattern
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_Dissector,`Dissector`>> handle if found, otherwise `nil`
+
+// function_returns_footer: dissectortable:get_dissector
+// function_footer: dissectortable_get_dissector_pattern_
+
+// wslua_dissector.c
+[#lua_fn_dissectortable_add_for_decode_as_proto_]
+===== dissectortable:add_for_decode_as(proto)
+
+Add the given <<lua_class_Proto,`Proto`>> to the “Decode as...” list for this DissectorTable.
+The passed-in <<lua_class_Proto,`Proto`>> object's `dissector()` function is used for dissecting.
+
+[float]
+===== Arguments
+
+proto::
+
+The <<lua_class_Proto,`Proto`>> to add.
+
+// function_arg_footer: proto
+// end of function_args
+
+// function_footer: dissectortable_add_for_decode_as_proto_
+
+// wslua_dissector.c
+[#lua_fn_dissectortable___tostring__]
+===== dissectortable:__tostring()
+
+Gets some debug information about the <<lua_class_DissectorTable,`DissectorTable`>>.
+
+[float]
+===== Returns
+
+A string of debug information about the <<lua_class_DissectorTable,`DissectorTable`>>.
+
+// function_returns_footer: dissectortable:__tostring
+// function_footer: dissectortable___tostring__
+
+// class_footer: DissectorTable
+
+// wslua_proto_field.c
+[#lua_class_Pref]
+==== Pref
+
+A preference of a <<lua_class_Proto,`Proto`>>.
+
+// wslua_pref.c
+[#lua_fn_Pref_bool_label__default__description_]
+===== Pref.bool(label, default, description)
+
+Creates a boolean preference to be added to a <<lua_class_attrib_proto_prefs,`Proto.prefs`>> Lua table.
+
+===== Example
+
+[source,lua]
+----
+    -- create a Boolean preference named "bar" for Foo Protocol
+    -- (assuming Foo doesn't already have a preference named "bar")
+    proto_foo.prefs.bar = Pref.bool( "Bar", true, "Baz and all the rest" )
+----
+
+[float]
+===== Arguments
+
+label::
+
+The Label (text in the right side of the
+preference input) for this preference.
+
+// function_arg_footer: label
+default::
+
+The default value for this preference.
+
+// function_arg_footer: default
+description::
+
+A description of this preference.
+
+// function_arg_footer: description
+// end of function_args
+
+// function_footer: Pref_bool_label__default__description_
+
+// wslua_pref.c
+[#lua_fn_Pref_uint_label__default__description_]
+===== Pref.uint(label, default, description)
+
+Creates an (unsigned) integer preference to be added to a <<lua_class_attrib_proto_prefs,`Proto.prefs`>> Lua table.
+
+[float]
+===== Arguments
+
+label::
+
+The Label (text in the right side of the
+preference input) for this preference.
+
+// function_arg_footer: label
+default::
+
+The default value for this preference.
+
+// function_arg_footer: default
+description::
+
+A description of what this preference is.
+
+// function_arg_footer: description
+// end of function_args
+
+// function_footer: Pref_uint_label__default__description_
+
+// wslua_pref.c
+[#lua_fn_Pref_string_label__default__description_]
+===== Pref.string(label, default, description)
+
+Creates a string preference to be added to a <<lua_class_attrib_proto_prefs,`Proto.prefs`>> Lua table.
+
+[float]
+===== Arguments
+
+label::
+
+The Label (text in the right side of the
+preference input) for this preference.
+
+// function_arg_footer: label
+default::
+
+The default value for this preference.
+
+// function_arg_footer: default
+description::
+
+A description of what this preference is.
+
+// function_arg_footer: description
+// end of function_args
+
+// function_footer: Pref_string_label__default__description_
+
+// wslua_pref.c
+[#lua_fn_Pref_enum_label__default__description__enum__radio_]
+===== Pref.enum(label, default, description, enum, radio)
+
+Creates an enum preference to be added to a <<lua_class_attrib_proto_prefs,`Proto.prefs`>> Lua table.
+
+===== Example:
+
+[source,lua]
+----
+    local OUTPUT_OFF        = 0
+    local OUTPUT_DEBUG      = 1
+    local OUTPUT_INFO       = 2
+    local OUTPUT_WARN       = 3
+    local OUTPUT_ERROR      = 4
+
+    local output_tab = {
+            { 1, "Off"              , OUTPUT_OFF },
+            { 2, "Debug"            , OUTPUT_DEBUG },
+            { 3, "Information"      , OUTPUT_INFO },
+            { 4, "Warning"          , OUTPUT_WARN },
+            { 5, "Error"            , OUTPUT_ERROR },
+    }
+
+    -- Create enum preference that shows as Combo Box under
+    -- Foo Protocol's preferences
+    proto_foo.prefs.outputlevel = Pref.enum(
+            "Output Level",                 -- label
+            OUTPUT_INFO,                    -- default value
+            "Verbosity of log output",      -- description
+            output_tab,                     -- enum table
+            false                           -- show as combo box
+    )
+
+    -- Then, we can query the value of the selected preference.
+    -- This line prints "Output Level: 3" assuming the selected
+    -- output level is _INFO.
+    debug( "Output Level: " .. proto_foo.prefs.outputlevel )
+----
+
+[float]
+===== Arguments
+
+label::
+
+The Label (text in the right side of the
+preference input) for this preference.
+
+// function_arg_footer: label
+default::
+
+The default value for this preference.
+
+// function_arg_footer: default
+description::
+
+A description of what this preference is.
+
+// function_arg_footer: description
+enum::
+
+An enum Lua table.
+
+// function_arg_footer: enum
+radio::
+
+Radio button (true) or Combobox (false).
+
+// function_arg_footer: radio
+// end of function_args
+
+// function_footer: Pref_enum_label__default__description__enum__radio_
+
+// wslua_pref.c
+[#lua_fn_Pref_range_label__default__description__max_]
+===== Pref.range(label, default, description, max)
+
+Creates a range (numeric text entry) preference to be added to a <<lua_class_attrib_proto_prefs,`Proto.prefs`>> Lua table.
+
+[float]
+===== Arguments
+
+label::
+
+The Label (text in the right side of the preference
+input) for this preference.
+
+// function_arg_footer: label
+default::
+
+The default value for this preference, e.g., "53",
+"10-30", or "10-30,53,55,100-120".
+
+// function_arg_footer: default
+description::
+
+A description of what this preference is.
+
+// function_arg_footer: description
+max::
+
+The maximum value.
+
+// function_arg_footer: max
+// end of function_args
+
+// function_footer: Pref_range_label__default__description__max_
+
+// wslua_pref.c
+[#lua_fn_Pref_statictext_label__description_]
+===== Pref.statictext(label, description)
+
+Creates a static text string to be added to a <<lua_class_attrib_proto_prefs,`Proto.prefs`>> Lua table.
+
+[float]
+===== Arguments
+
+label::
+
+The static text.
+
+// function_arg_footer: label
+description::
+
+The static text description.
+
+// function_arg_footer: description
+// end of function_args
+
+// function_footer: Pref_statictext_label__description_
+
+// class_footer: Pref
+
+// wslua_proto_field.c
+[#lua_class_Prefs]
+==== Prefs
+
+The table of preferences of a protocol.
+
+// wslua_pref.c
+[#lua_fn_prefs___newindex_name__pref_]
+===== prefs:__newindex(name, pref)
+
+Creates a new preference.
+
+[float]
+===== Arguments
+
+name::
+
+The abbreviation of this preference.
+
+// function_arg_footer: name
+pref::
+
+A valid but still unassigned Pref object.
+
+// function_arg_footer: pref
+// end of function_args
+
+[float]
+===== Errors
+
+* Unknown Pref type
+
+// function_errors_footer: prefs:__newindex
+// function_footer: prefs___newindex_name__pref_
+
+// wslua_pref.c
+[#lua_fn_prefs___index_name_]
+===== prefs:__index(name)
+
+Get the value of a preference setting.
+
+===== Example
+
+[source,lua]
+----
+    -- print the value of Foo's preference named "bar"
+    debug( "bar = " .. proto_foo.prefs.bar )
+----
+
+[float]
+===== Arguments
+
+name::
+
+The abbreviation of this preference.
+
+// function_arg_footer: name
+// end of function_args
+
+[float]
+===== Returns
+
+The current value of the preference.
+
+// function_returns_footer: prefs:__index
+[float]
+===== Errors
+
+* Unknown Pref type
+
+// function_errors_footer: prefs:__index
+// function_footer: prefs___index_name_
+
+// class_footer: Prefs
+
+// wslua_proto_field.c
+[#lua_class_Proto]
+==== Proto
+
+A new protocol in Wireshark.
+Protocols have several uses.
+The main one is to dissect a protocol, but they can also be dummies used to register preferences for other purposes.
+
+// wslua_proto.c
+[#lua_fn_Proto_new_name__description_]
+===== Proto.new(name, description)
+
+Creates a new <<lua_class_Proto,`Proto`>> object.
+
+[float]
+===== Arguments
+
+name::
+
+The name of the protocol.
+
+// function_arg_footer: name
+description::
+
+A Long Text description of the protocol (usually lowercase).
+
+// function_arg_footer: description
+// end of function_args
+
+[float]
+===== Returns
+
+The newly created <<lua_class_Proto,`Proto`>> object.
+
+// function_returns_footer: Proto.new
+// function_footer: Proto_new_name__description_
+
+// wslua_proto.c
+[#lua_fn_proto___call_name__description_]
+===== proto:__call(name, description)
+
+Creates a <<lua_class_Proto,`Proto`>> object.
+
+[float]
+===== Arguments
+
+name::
+
+The name of the protocol.
+
+// function_arg_footer: name
+description::
+
+A Long Text description of the protocol (usually lowercase).
+
+// function_arg_footer: description
+// end of function_args
+
+[float]
+===== Returns
+
+The new <<lua_class_Proto,`Proto`>> object.
+
+// function_returns_footer: proto:__call
+// function_footer: proto___call_name__description_
+
+// wslua_proto.c
+[#lua_fn_proto_register_heuristic_listname__func_]
+===== proto:register_heuristic(listname, func)
+
+Registers a heuristic dissector function for this <<lua_class_Proto,`Proto`>> protocol,
+for the given heuristic list name.
+
+When later called, the passed-in function will be given:
+
+1. A <<lua_class_Tvb,`Tvb`>> object
+2. A <<lua_class_Pinfo,`Pinfo`>> object
+3. A <<lua_class_TreeItem,`TreeItem`>> object
+
+The function must return `true` if the payload is for it, else `false`.
+
+The function should perform as much verification as possible to ensure the payload is for it,
+and dissect the packet (including setting TreeItem info and such) only if the payload is for it,
+before returning true or false.
+
+Since version 1.99.1, this function also accepts a Dissector object as the second argument,
+to allow re-using the same Lua code as the `function proto.dissector(...)`. In this case,
+the Dissector must return a Lua number of the number of bytes consumed/parsed: if 0 is returned,
+it will be treated the same as a `false` return for the heuristic; if a positive or negative
+number is returned, then the it will be treated the same as a `true` return for the heuristic,
+meaning the packet is for this protocol and no other heuristic will be tried.
+
+[float]
+===== Arguments
+
+listname::
+
+The heuristic list name this function
+is a heuristic for (e.g., "udp" or
+"infiniband.payload").
+
+// function_arg_footer: listname
+func::
+
+A Lua function that will be invoked for
+heuristic dissection.
+
+// function_arg_footer: func
+// end of function_args
+
+// function_footer: proto_register_heuristic_listname__func_
+
+[#lua_class_attrib_proto_dissector]
+===== proto.dissector
+
+Mode: Retrieve or assign.
+
+The protocol's dissector, a function you define.
+
+When later called, the function will be given:
+
+1. A <<lua_class_Tvb,`Tvb`>> object
+2. A <<lua_class_Pinfo,`Pinfo`>> object
+3. A <<lua_class_TreeItem,`TreeItem`>> object
+
+// End proto.dissector
+
+[#lua_class_attrib_proto_prefs]
+===== proto.prefs
+
+Mode: Retrieve only.
+
+The preferences of this dissector.
+
+// End proto.prefs
+
+[#lua_class_attrib_proto_prefs_changed]
+===== proto.prefs_changed
+
+Mode: Assign only.
+
+The preferences changed routine of this dissector,
+a Lua function you define.
+
+The function is called when the protocol's preferences are changed.
+It is passed no arguments.
+
+// End proto.prefs_changed
+
+[#lua_class_attrib_proto_init]
+===== proto.init
+
+Mode: Assign only.
+
+The init routine of this dissector, a function you define.
+
+The init function is called when the a new capture file is opened or when
+the open capture file is closed.  It is passed no arguments.
+
+// End proto.init
+
+[#lua_class_attrib_proto_name]
+===== proto.name
+
+Mode: Retrieve only.
+
+The name given to this dissector.
+
+// End proto.name
+
+[#lua_class_attrib_proto_description]
+===== proto.description
+
+Mode: Retrieve only.
+
+The description given to this dissector.
+
+// End proto.description
+
+[#lua_class_attrib_proto_fields]
+===== proto.fields
+
+Mode: Retrieve or assign.
+
+The `ProtoField`++'++s Lua table of this dissector.
+
+// End proto.fields
+
+[#lua_class_attrib_proto_experts]
+===== proto.experts
+
+Mode: Retrieve or assign.
+
+The expert info Lua table of this `Proto`.
+
+// End proto.experts
+
+// class_footer: Proto
+
+// wslua_proto_field.c
+[#lua_class_ProtoExpert]
+==== ProtoExpert
+
+A Protocol expert info field, to be used when adding items to the dissection tree.
+
+// wslua_proto_expert.c
+[#lua_fn_ProtoExpert_new_abbr__text__group__severity_]
+===== ProtoExpert.new(abbr, text, group, severity)
+
+Creates a new `ProtoExpert` object to be used for a protocol's expert information notices.
+
+[float]
+===== Arguments
+
+abbr::
+
+Filter name of the expert info field (the string that
+is used in filters).
+
+// function_arg_footer: abbr
+text::
+
+The default text of the expert field.
+
+// function_arg_footer: text
+group::
+
+Expert group type: one of:
+`expert.group.CHECKSUM`,
+`expert.group.SEQUENCE`,
+`expert.group.RESPONSE_CODE`,
+`expert.group.REQUEST_CODE`,
+`expert.group.UNDECODED`,
+`expert.group.REASSEMBLE`,
+`expert.group.MALFORMED`,
+`expert.group.DEBUG`,
+`expert.group.PROTOCOL`,
+`expert.group.SECURITY`,
+`expert.group.COMMENTS_GROUP`,
+`expert.group.DECRYPTION`,
+`expert.group.ASSUMPTION`,
+`expert.group.DEPRECATED`,
+`expert.group.RECEIVE`,
+or `expert.group.INTERFACE`.
+
+// function_arg_footer: group
+severity::
+
+Expert severity type: one of:
+`expert.severity.COMMENT`,
+`expert.severity.CHAT`,
+`expert.severity.NOTE`,
+`expert.severity.WARN`,
+or `expert.severity.ERROR`.
+
+// function_arg_footer: severity
+// end of function_args
+
+[float]
+===== Returns
+
+The newly created `ProtoExpert` object.
+
+// function_returns_footer: ProtoExpert.new
+// function_footer: ProtoExpert_new_abbr__text__group__severity_
+
+// wslua_proto_expert.c
+[#lua_fn_protoexpert___tostring__]
+===== protoexpert:__tostring()
+
+Returns a string with debugging information about a `ProtoExpert` object.
+
+// function_footer: protoexpert___tostring__
+
+// class_footer: ProtoExpert
+
+// wslua_proto_field.c
+[#lua_class_ProtoField]
+==== ProtoField
+
+A Protocol field (to be used when adding items to the dissection tree).
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_new_name__abbr__type___valuestring____base____mask____description__]
+===== ProtoField.new(name, abbr, type, [valuestring], [base], [mask], [description])
+
+Creates a new <<lua_class_ProtoField,`ProtoField`>> object to be used for a protocol field.
+
+[float]
+===== Arguments
+
+name::
+
+Actual name of the field (the string that
+appears in the tree).
+
+// function_arg_footer: name
+abbr::
+
+Filter name of the field (the string that
+is used in filters).
+
+// function_arg_footer: abbr
+type::
+
+Field Type: one of: `ftypes.BOOLEAN`, `ftypes.CHAR`, `ftypes.UINT8`,
+`ftypes.UINT16`, `ftypes.UINT24`, `ftypes.UINT32`, `ftypes.UINT64`, `ftypes.INT8`,
+`ftypes.INT16`, `ftypes.INT24`, `ftypes.INT32`, `ftypes.INT64`, `ftypes.FLOAT`,
+`ftypes.DOUBLE` , `ftypes.ABSOLUTE_TIME`, `ftypes.RELATIVE_TIME`, `ftypes.STRING`,
+`ftypes.STRINGZ`, `ftypes.UINT_STRING`, `ftypes.ETHER`, `ftypes.BYTES`,
+`ftypes.UINT_BYTES`, `ftypes.IPv4`, `ftypes.IPv6`, `ftypes.IPXNET`, `ftypes.FRAMENUM`,
+`ftypes.PCRE`, `ftypes.GUID`, `ftypes.OID`, `ftypes.PROTOCOL`, `ftypes.REL_OID`,
+`ftypes.SYSTEM_ID`, `ftypes.EUI64` or `ftypes.NONE`.
+
+// function_arg_footer: type
+valuestring (optional)::
+
+A table containing the text that
+corresponds to the values, or a table containing tables of range string values that
+corresponds to the values ({min, max, "string"}) if the base is `base.RANGE_STRING`, or a table containing unit name
+for the values if base is `base.UNIT_STRING`, or one of `frametype.NONE`, `frametype.REQUEST`,
+`frametype.RESPONSE`, `frametype.ACK` or `frametype.DUP_ACK` if field type is ftypes.FRAMENUM.
+
+// function_arg_footer: valuestring (optional)
+base (optional)::
+
+The representation, one of: `base.NONE`, `base.DEC`,
+`base.HEX`, `base.OCT`, `base.DEC_HEX`,
+`base.HEX_DEC`, `base.UNIT_STRING` or
+`base.RANGE_STRING`.
+
+// function_arg_footer: base (optional)
+mask (optional)::
+
+The bitmask to be used.
+
+// function_arg_footer: mask (optional)
+description (optional)::
+
+The description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The newly created <<lua_class_ProtoField,`ProtoField`>> object.
+
+// function_returns_footer: ProtoField.new
+// function_footer: ProtoField_new_name__abbr__type___valuestring____base____mask____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_char_abbr___name____base____valuestring____mask____description__]
+===== ProtoField.char(abbr, [name], [base], [valuestring], [mask], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> of an 8-bit ASCII character.
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+base (optional)::
+
+One of `base.NONE`, `base.HEX`, `base.OCT` or `base.RANGE_STRING`.
+
+// function_arg_footer: base (optional)
+valuestring (optional)::
+
+A table containing the text that corresponds to the values, or a table containing tables of range string values that correspond to the values ({min, max, "string"}) if the base is `base.RANGE_STRING`.
+
+// function_arg_footer: valuestring (optional)
+mask (optional)::
+
+Integer mask of this field.
+
+// function_arg_footer: mask (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.char
+// function_footer: ProtoField_char_abbr___name____base____valuestring____mask____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_uint8_abbr___name____base____valuestring____mask____description__]
+===== ProtoField.uint8(abbr, [name], [base], [valuestring], [mask], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> of an unsigned 8-bit integer (i.e., a byte).
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+base (optional)::
+
+One of `base.DEC`, `base.HEX` or `base.OCT`, `base.DEC_HEX`, `base.HEX_DEC`, `base.UNIT_STRING` or `base.RANGE_STRING`.
+
+// function_arg_footer: base (optional)
+valuestring (optional)::
+
+A table containing the text that corresponds to the values, or a table containing tables of range string values that correspond to the values ({min, max, "string"}) if the base is `base.RANGE_STRING`, or a table containing the unit name for the values if base is `base.UNIT_STRING`.
+
+// function_arg_footer: valuestring (optional)
+mask (optional)::
+
+Integer, String or UInt64 mask of this field.
+
+// function_arg_footer: mask (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.uint8
+// function_footer: ProtoField_uint8_abbr___name____base____valuestring____mask____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_uint16_abbr___name____base____valuestring____mask____description__]
+===== ProtoField.uint16(abbr, [name], [base], [valuestring], [mask], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> of an unsigned 16-bit integer.
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+base (optional)::
+
+One of `base.DEC`, `base.HEX`, `base.OCT`, `base.DEC_HEX`, `base.HEX_DEC`, `base.UNIT_STRING` or `base.RANGE_STRING`.
+
+// function_arg_footer: base (optional)
+valuestring (optional)::
+
+A table containing the text that corresponds to the values, or a table containing tables of range string values that correspond to the values ({min, max, "string"}) if the base is `base.RANGE_STRING`, or a table containing unit name for the values if base is `base.UNIT_STRING`.
+
+// function_arg_footer: valuestring (optional)
+mask (optional)::
+
+Integer, String or UInt64 mask of this field.
+
+// function_arg_footer: mask (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.uint16
+// function_footer: ProtoField_uint16_abbr___name____base____valuestring____mask____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_uint24_abbr___name____base____valuestring____mask____description__]
+===== ProtoField.uint24(abbr, [name], [base], [valuestring], [mask], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> of an unsigned 24-bit integer.
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+base (optional)::
+
+One of `base.DEC`, `base.HEX`, `base.OCT`, `base.DEC_HEX`, `base.HEX_DEC`, `base.UNIT_STRING`, or `base.RANGE_STRING`.
+
+// function_arg_footer: base (optional)
+valuestring (optional)::
+
+A table containing the text that corresponds to the values, or a table containing tables of range string values that correspond to the values ({min, max, "string"}) if the base is `base.RANGE_STRING`, or a table containing the unit name for the values if base is `base.UNIT_STRING`.
+
+// function_arg_footer: valuestring (optional)
+mask (optional)::
+
+Integer, String or UInt64 mask of this field.
+
+// function_arg_footer: mask (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.uint24
+// function_footer: ProtoField_uint24_abbr___name____base____valuestring____mask____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_uint32_abbr___name____base____valuestring____mask____description__]
+===== ProtoField.uint32(abbr, [name], [base], [valuestring], [mask], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> of an unsigned 32-bit integer.
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+base (optional)::
+
+One of `base.DEC`, `base.HEX`, `base.OCT`, `base.DEC_HEX`, `base.HEX_DEC`, `base.UNIT_STRING`, or `base.RANGE_STRING`.
+
+// function_arg_footer: base (optional)
+valuestring (optional)::
+
+A table containing the text that corresponds to the values, or a table containing tables of range string values that correspond to the values ({min, max, "string"}) if the base is `base.RANGE_STRING`, or a table containing the unit name for the values if base is `base.UNIT_STRING`.
+
+// function_arg_footer: valuestring (optional)
+mask (optional)::
+
+Integer, String or UInt64 mask of this field.
+
+// function_arg_footer: mask (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.uint32
+// function_footer: ProtoField_uint32_abbr___name____base____valuestring____mask____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_uint64_abbr___name____base____valuestring____mask____description__]
+===== ProtoField.uint64(abbr, [name], [base], [valuestring], [mask], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> of an unsigned 64-bit integer.
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+base (optional)::
+
+One of `base.DEC`, `base.HEX`, `base.OCT`, `base.DEC_HEX`, `base.HEX_DEC`, `base.UNIT_STRING`, or `base.RANGE_STRING`.
+
+// function_arg_footer: base (optional)
+valuestring (optional)::
+
+A table containing the text that corresponds to the values, or a table containing tables of range string values that correspond to the values ({min, max, "string"}) if the base is `base.RANGE_STRING`, or a table containing the unit name for the values if base is `base.UNIT_STRING`.
+
+// function_arg_footer: valuestring (optional)
+mask (optional)::
+
+Integer, String or UInt64 mask of this field.
+
+// function_arg_footer: mask (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.uint64
+// function_footer: ProtoField_uint64_abbr___name____base____valuestring____mask____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_int8_abbr___name____base____valuestring____mask____description__]
+===== ProtoField.int8(abbr, [name], [base], [valuestring], [mask], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> of a signed 8-bit integer (i.e., a byte).
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+base (optional)::
+
+One of `base.DEC`, `base.UNIT_STRING`, or `base.RANGE_STRING`.
+
+// function_arg_footer: base (optional)
+valuestring (optional)::
+
+A table containing the text that corresponds to the values, or a table containing tables of range string values that correspond to the values ({min, max, "string"}) if the base is `base.RANGE_STRING`, or a table containing unit name for the values if base is `base.UNIT_STRING`.
+
+// function_arg_footer: valuestring (optional)
+mask (optional)::
+
+Integer, String or UInt64 mask of this field.
+
+// function_arg_footer: mask (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.int8
+// function_footer: ProtoField_int8_abbr___name____base____valuestring____mask____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_int16_abbr___name____base____valuestring____mask____description__]
+===== ProtoField.int16(abbr, [name], [base], [valuestring], [mask], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> of a signed 16-bit integer.
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+base (optional)::
+
+One of `base.DEC`, `base.UNIT_STRING`, or `base.RANGE_STRING`.
+
+// function_arg_footer: base (optional)
+valuestring (optional)::
+
+A table containing the text that corresponds to the values, or a table containing tables of range string values that correspond to the values ({min, max, "string"}) if the base is `base.RANGE_STRING`, or a table containing unit name for the values if base is `base.UNIT_STRING`.
+
+// function_arg_footer: valuestring (optional)
+mask (optional)::
+
+Integer, String or UInt64 mask of this field.
+
+// function_arg_footer: mask (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.int16
+// function_footer: ProtoField_int16_abbr___name____base____valuestring____mask____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_int24_abbr___name____base____valuestring____mask____description__]
+===== ProtoField.int24(abbr, [name], [base], [valuestring], [mask], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> of a signed 24-bit integer.
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+base (optional)::
+
+One of `base.DEC`, `base.UNIT_STRING`, or `base.RANGE_STRING`.
+
+// function_arg_footer: base (optional)
+valuestring (optional)::
+
+A table containing the text that corresponds to the values, or a table containing tables of range string values that correspond to the values ({min, max, "string"}) if the base is `base.RANGE_STRING`, or a table containing unit name for the values if base is `base.UNIT_STRING`.
+
+// function_arg_footer: valuestring (optional)
+mask (optional)::
+
+Integer, String or UInt64 mask of this field.
+
+// function_arg_footer: mask (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.int24
+// function_footer: ProtoField_int24_abbr___name____base____valuestring____mask____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_int32_abbr___name____base____valuestring____mask____description__]
+===== ProtoField.int32(abbr, [name], [base], [valuestring], [mask], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> of a signed 32-bit integer.
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+base (optional)::
+
+One of `base.DEC`, `base.UNIT_STRING`, or `base.RANGE_STRING`.
+
+// function_arg_footer: base (optional)
+valuestring (optional)::
+
+A table containing the text that corresponds to the values, or a table containing tables of range string values that correspond to the values ({min, max, "string"}) if the base is `base.RANGE_STRING`, or a table containing unit name for the values if base is `base.UNIT_STRING`.
+
+// function_arg_footer: valuestring (optional)
+mask (optional)::
+
+Integer, String or UInt64 mask of this field.
+
+// function_arg_footer: mask (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.int32
+// function_footer: ProtoField_int32_abbr___name____base____valuestring____mask____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_int64_abbr___name____base____valuestring____mask____description__]
+===== ProtoField.int64(abbr, [name], [base], [valuestring], [mask], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> of a signed 64-bit integer.
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+base (optional)::
+
+One of `base.DEC`, `base.UNIT_STRING`, or `base.RANGE_STRING`.
+
+// function_arg_footer: base (optional)
+valuestring (optional)::
+
+A table containing the text that corresponds to the values, or a table containing tables of range string values that correspond to the values ({min, max, "string"}) if the base is `base.RANGE_STRING`, or a table containing unit name for the values if base is `base.UNIT_STRING`.
+
+// function_arg_footer: valuestring (optional)
+mask (optional)::
+
+Integer, String or UInt64 mask of this field.
+
+// function_arg_footer: mask (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.int64
+// function_footer: ProtoField_int64_abbr___name____base____valuestring____mask____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_framenum_abbr___name____base____frametype____mask____description__]
+===== ProtoField.framenum(abbr, [name], [base], [frametype], [mask], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> for a frame number (for hyperlinks between frames).
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+base (optional)::
+
+Only `base.NONE` is supported for framenum.
+
+// function_arg_footer: base (optional)
+frametype (optional)::
+
+One of `frametype.NONE`, `frametype.REQUEST`, `frametype.RESPONSE`, `frametype.ACK` or `frametype.DUP_ACK`.
+
+// function_arg_footer: frametype (optional)
+mask (optional)::
+
+Integer, String or UInt64 mask of this field, which must be 0 for framenum.
+
+// function_arg_footer: mask (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.framenum
+// function_footer: ProtoField_framenum_abbr___name____base____frametype____mask____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_bool_abbr___name____display____valuestring____mask____description__]
+===== ProtoField.bool(abbr, [name], [display], [valuestring], [mask], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> for a boolean true/false value.
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+display (optional)::
+
+How wide the parent bitfield is (`base.NONE` is used for NULL-value).
+
+// function_arg_footer: display (optional)
+valuestring (optional)::
+
+A table containing the text that corresponds to the values.
+
+// function_arg_footer: valuestring (optional)
+mask (optional)::
+
+Integer, String or UInt64 mask of this field.
+
+// function_arg_footer: mask (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.bool
+// function_footer: ProtoField_bool_abbr___name____display____valuestring____mask____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_absolute_time_abbr___name____base____description__]
+===== ProtoField.absolute_time(abbr, [name], [base], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> of a time_t structure value.
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+base (optional)::
+
+One of `base.LOCAL`, `base.UTC` or `base.DOY_UTC`.
+
+// function_arg_footer: base (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.absolute_time
+// function_footer: ProtoField_absolute_time_abbr___name____base____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_relative_time_abbr___name____description__]
+===== ProtoField.relative_time(abbr, [name], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> of a time_t structure value.
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.relative_time
+// function_footer: ProtoField_relative_time_abbr___name____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_float_abbr___name____valuestring____description__]
+===== ProtoField.float(abbr, [name], [valuestring], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> of a floating point number (4 bytes).
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+valuestring (optional)::
+
+A table containing unit name for the values.
+
+// function_arg_footer: valuestring (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.float
+// function_footer: ProtoField_float_abbr___name____valuestring____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_double_abbr___name____valuestring____description__]
+===== ProtoField.double(abbr, [name], [valuestring], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> of a double-precision floating point (8 bytes).
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+valuestring (optional)::
+
+A table containing unit name for the values.
+
+// function_arg_footer: valuestring (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.double
+// function_footer: ProtoField_double_abbr___name____valuestring____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_string_abbr___name____display____description__]
+===== ProtoField.string(abbr, [name], [display], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> of a string value.
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+display (optional)::
+
+One of `base.ASCII` or `base.UNICODE`.
+
+// function_arg_footer: display (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.string
+// function_footer: ProtoField_string_abbr___name____display____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_stringz_abbr___name____display____description__]
+===== ProtoField.stringz(abbr, [name], [display], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> of a zero-terminated string value.
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+display (optional)::
+
+One of `base.ASCII` or `base.UNICODE`.
+
+// function_arg_footer: display (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.stringz
+// function_footer: ProtoField_stringz_abbr___name____display____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_bytes_abbr___name____display____description__]
+===== ProtoField.bytes(abbr, [name], [display], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> for an arbitrary number of bytes.
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+display (optional)::
+
+One of `base.NONE`, `base.DOT`, `base.DASH`, `base.COLON` or `base.SPACE`.
+
+// function_arg_footer: display (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.bytes
+// function_footer: ProtoField_bytes_abbr___name____display____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_ubytes_abbr___name____display____description__]
+===== ProtoField.ubytes(abbr, [name], [display], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> for an arbitrary number of unsigned bytes.
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+display (optional)::
+
+One of `base.NONE`, `base.DOT`, `base.DASH`, `base.COLON` or `base.SPACE`.
+
+// function_arg_footer: display (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.ubytes
+// function_footer: ProtoField_ubytes_abbr___name____display____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_none_abbr___name____description__]
+===== ProtoField.none(abbr, [name], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> of an unstructured type.
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.none
+// function_footer: ProtoField_none_abbr___name____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_ipv4_abbr___name____description__]
+===== ProtoField.ipv4(abbr, [name], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> of an IPv4 address (4 bytes).
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.ipv4
+// function_footer: ProtoField_ipv4_abbr___name____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_ipv6_abbr___name____description__]
+===== ProtoField.ipv6(abbr, [name], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> of an IPv6 address (16 bytes).
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.ipv6
+// function_footer: ProtoField_ipv6_abbr___name____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_ether_abbr___name____description__]
+===== ProtoField.ether(abbr, [name], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> of an Ethernet address (6 bytes).
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.ether
+// function_footer: ProtoField_ether_abbr___name____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_guid_abbr___name____description__]
+===== ProtoField.guid(abbr, [name], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> for a Globally Unique IDentifier (GUID).
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.guid
+// function_footer: ProtoField_guid_abbr___name____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_oid_abbr___name____description__]
+===== ProtoField.oid(abbr, [name], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> for an ASN.1 Organizational IDentified (OID).
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.oid
+// function_footer: ProtoField_oid_abbr___name____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_protocol_abbr___name____description__]
+===== ProtoField.protocol(abbr, [name], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> for a sub-protocol.
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.protocol
+// function_footer: ProtoField_protocol_abbr___name____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_rel_oid_abbr___name____description__]
+===== ProtoField.rel_oid(abbr, [name], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> for an ASN.1 Relative-OID.
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.rel_oid
+// function_footer: ProtoField_rel_oid_abbr___name____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_systemid_abbr___name____description__]
+===== ProtoField.systemid(abbr, [name], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> for an OSI System ID.
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.systemid
+// function_footer: ProtoField_systemid_abbr___name____description__
+
+// wslua_proto_field.c
+[#lua_fn_ProtoField_eui64_abbr___name____description__]
+===== ProtoField.eui64(abbr, [name], [description])
+
+Creates a <<lua_class_ProtoField,`ProtoField`>> for an EUI64.
+
+[float]
+===== Arguments
+
+abbr::
+
+Abbreviated name of the field (the string used in filters).
+
+// function_arg_footer: abbr
+name (optional)::
+
+Actual name of the field (the string that appears in the tree).
+
+// function_arg_footer: name (optional)
+description (optional)::
+
+Description of the field.
+
+// function_arg_footer: description (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+A <<lua_class_ProtoField,`ProtoField`>> object to be added to a table set to the <<lua_class_attrib_proto_fields,`Proto.fields`>> attribute.
+
+// function_returns_footer: ProtoField.eui64
+// function_footer: ProtoField_eui64_abbr___name____description__
+
+// wslua_proto_field.c
+[#lua_fn_protofield___tostring__]
+===== protofield:__tostring()
+
+Returns a string with info about a protofield (for debugging purposes).
+
+// function_footer: protofield___tostring__
+
+[#lua_class_attrib_protofield_type]
+===== protofield.type
+
+Mode: Retrieve only.
+
+The type of the field.
+
+Since: 4.3.0
+
+// End protofield.type
+
+[#lua_class_attrib_protofield_abbr]
+===== protofield.abbr
+
+Mode: Retrieve only.
+
+The abbreviated name of the field.
+
+Since: 4.3.0
+
+// End protofield.abbr
+
+[#lua_class_attrib_protofield_name]
+===== protofield.name
+
+Mode: Retrieve only.
+
+The actual name of the field.
+
+Since: 4.3.0
+
+// End protofield.name
+
+[#lua_class_attrib_protofield_base]
+===== protofield.base
+
+Mode: Retrieve only.
+
+The base of the field.
+
+Since: 4.3.0
+
+// End protofield.base
+
+[#lua_class_attrib_protofield_valuestring]
+===== protofield.valuestring
+
+Mode: Retrieve only.
+
+The valuestring of the field.
+
+Since: 4.3.0
+
+// End protofield.valuestring
+
+[#lua_class_attrib_protofield_mask]
+===== protofield.mask
+
+Mode: Retrieve only.
+
+The mask of the field.
+
+Since: 4.3.0
+
+// End protofield.mask
+
+[#lua_class_attrib_protofield_description]
+===== protofield.description
+
+Mode: Retrieve only.
+
+The description of this field.
+
+Since: 4.3.0
+
+// End protofield.description
+
+// class_footer: ProtoField
+[#global_functions_Proto]
+==== Global Functions
+
+// wslua_proto.c
+[#lua_fn_register_postdissector_proto___allfields__]
+===== register_postdissector(proto, [allfields])
+
+Make a <<lua_class_Proto,`Proto`>> protocol (with a dissector function) a post-dissector.
+It will be called for every frame after dissection.
+
+[float]
+===== Arguments
+
+proto::
+
+The protocol to be used as post-dissector.
+
+// function_arg_footer: proto
+allfields (optional)::
+
+Whether to generate all fields.
+Note: This impacts performance (default=false).
+
+// function_arg_footer: allfields (optional)
+// end of function_args
+
+// function_footer: register_postdissector_proto___allfields__
+
+// wslua_proto.c
+[#lua_fn_dissect_tcp_pdus_tvb__tree__min_header_size__get_len_func__dissect_func___desegment__]
+===== dissect_tcp_pdus(tvb, tree, min_header_size, get_len_func, dissect_func, [desegment])
+
+Make the TCP-layer invoke the given Lua dissection function for each
+PDU in the TCP segment, of the length returned by the given get_len_func
+function.
+
+This function is useful for protocols that run over TCP and that are
+either a fixed length always, or have a minimum size and have a length
+field encoded within that minimum portion that identifies their full
+length. For such protocols, their protocol dissector function can invoke
+this `dissect_tcp_pdus()` function to make it easier to handle dissecting
+their protocol's messages (i.e., their protocol data unit (PDU)). This
+function shouild not be used for protocols whose PDU length cannot be
+determined from a fixed minimum portion, such as HTTP or Telnet.
+
+[float]
+===== Arguments
+
+tvb::
+
+The Tvb buffer to dissect PDUs from.
+
+// function_arg_footer: tvb
+tree::
+
+The Tvb buffer to dissect PDUs from.
+
+// function_arg_footer: tree
+min_header_size::
+
+The number of bytes
+in the fixed-length part of the PDU.
+
+// function_arg_footer: min_header_size
+get_len_func::
+
+A Lua function that will be
+called for each PDU, to determine the full length of the
+PDU. The called function will be given (1) the `Tvb` object
+of the whole `Tvb` (possibly reassembled), (2) the `Pinfo` object,
+and (3) an offset number of the index of the first byte
+of the PDU (i.e., its first header byte). The Lua function
+must return a Lua number of the full length of the PDU.
+
+// function_arg_footer: get_len_func
+dissect_func::
+
+A Lua function that will be
+called for each PDU, to dissect the PDU. The called
+function will be given (1) the `Tvb` object of the PDU's
+`Tvb` (possibly reassembled), (2) the `Pinfo` object,
+and (3) the `TreeItem` object. The Lua function must
+return a Lua number of the number of bytes read/handled,
+which would typically be the `Tvb:len()`.
+
+// function_arg_footer: dissect_func
+desegment (optional)::
+
+Whether to reassemble PDUs
+crossing TCP segment boundaries or not. (default=true)
+
+// function_arg_footer: desegment (optional)
+// end of function_args
+
+// function_footer: dissect_tcp_pdus_tvb__tree__min_header_size__get_len_func__dissect_func___desegment__
+// Global function
+// end of module

@@ -1,0 +1,643 @@
+// wslua_tree.c
+[#lua_module_Tree]
+=== Adding Information To The Dissection Tree
+
+// wslua_tree.c
+[#lua_class_TreeItem]
+==== TreeItem
+
+<<lua_class_TreeItem,`TreeItem`>>s represent information in the https://www.wireshark.org/docs/wsug_html_chunked/ChUsePacketDetailsPaneSection.html[packet details] pane of Wireshark, and the packet details view of TShark.
+A <<lua_class_TreeItem,`TreeItem`>> represents a node in the tree, which might also be a subtree and have a list of children.
+The children of a subtree have zero or more siblings which are other children of the same <<lua_class_TreeItem,`TreeItem`>> subtree.
+
+During dissection, heuristic-dissection, and post-dissection, a root <<lua_class_TreeItem,`TreeItem`>> is passed to dissectors as the third argument of the function
+callback (e.g., `myproto.dissector(tvbuf,pktinfo,root)`).
+
+In some cases the tree is not truly added to, in order to improve performance.
+For example for packets not currently displayed/selected in Wireshark's visible
+window pane, or if TShark isn't invoked with the `-V` switch. However the
+"add" type <<lua_class_TreeItem,`TreeItem`>> functions can still be called, and still return <<lua_class_TreeItem,`TreeItem`>>
+objects - but the info isn't really added to the tree. Therefore you do not
+typically need to worry about whether there's a real tree or not. If, for some
+reason, you need to know it, you can use the <<lua_class_attrib_treeitem_visible,`TreeItem.visible`>> attribute getter
+to retrieve the state.
+
+// wslua_tree.c
+[#lua_fn_treeitem_add_packet_field_protofield___tvbrange___encoding___label__]
+===== treeitem:add_packet_field(protofield, [tvbrange], encoding, [label])
+
+Adds a new child tree for the given <<lua_class_ProtoField,`ProtoField`>> object to this tree item,
+returning the new child <<lua_class_TreeItem,`TreeItem`>>.
+
+Unlike `TreeItem:add()` and `TreeItem:add_le()`, the <<lua_class_ProtoField,`ProtoField`>> argument
+is not optional, and cannot be a `Proto` object. Instead, this function always
+uses the <<lua_class_ProtoField,`ProtoField`>> to determine the type of field to extract from the
+passed-in `TvbRange`, highlighting the relevant bytes in the Packet Bytes pane
+of the GUI (if there is a GUI), etc.  If no <<lua_class_TvbRange,`TvbRange`>>is given, no bytes are
+highlighted and the field's value cannot be determined; the <<lua_class_ProtoField,`ProtoField`>> must
+have been defined/created not to have a length in such a case, or an error will
+occur.  For backwards-compatibility reasons the `encoding` argument, however,
+must still be given.
+
+Unlike `TreeItem:add()` and `TreeItem:add_le()`, this function performs both
+big-endian and little-endian decoding, by setting the `encoding` argument to
+be `ENC_BIG_ENDIAN` or `ENC_LITTLE_ENDIAN`.
+
+The signature of this function:
+
+[source,lua]
+----
+     tree_item:add_packet_field(proto_field [,tvbrange], encoding, ...)
+----
+
+In Wireshark version 1.11.3, this function was changed to return more than
+just the new child <<lua_class_TreeItem,`TreeItem`>>. The child is the first return value, so that
+function chaining will still work as before; but it now also returns more information.
+The second return is the value of the extracted field (i.e., a number, `UInt64`, `Address`, etc.).
+The third return is is the offset where data should be read next. This is useful when the length of the
+field is not known in advance. The additional return values may be null if the field type
+is not well supported in the Lua API.
+
+Another new feature added to this function in Wireshark version 1.11.3 is the
+ability to extract native number `ProtoField`++s++ from string encoding in the
+`TvbRange`, for ASCII-based and similar string encodings. For example, a
+<<lua_class_ProtoField,`ProtoField`>> of type `ftypes.UINT32` can be extracted from a `TvbRange`
+containing the ASCII string "123", and it will correctly decode the ASCII to
+the number `123`, both in the tree as well as for the second return value of
+this function. To do so, you must set the `encoding` argument of this function
+to the appropriate string `ENC_*` value, bitwise-or'd with the `ENC_STRING`
+value. `ENC_STRING` is guaranteed to be a unique bit flag, and
+thus it can added instead of bitwise-or'ed as well. Only single-byte ASCII digit
+string encoding types can be used for this, such as `ENC_ASCII` and `ENC_UTF_8`.
+
+For example, assuming the <<lua_class_Tvb,`Tvb`>> named "`tvb`" contains the string "123":
+
+[source,lua]
+----
+     -- this is done earlier in the script
+     local myfield = ProtoField.new("Transaction ID", "myproto.trans_id", ftypes.UINT16)
+
+     -- this is done inside a dissector, post-dissector, or heuristic function
+     -- child will be the created child tree, and value will be the number 123 or nil on failure
+     local child, value = tree:add_packet_field(myfield, tvb:range(0,3), ENC_UTF_8 + ENC_STRING)
+----
+
+[float]
+===== Arguments
+
+protofield::
+
+The ProtoField field object to add to the tree.
+
+// function_arg_footer: protofield
+tvbrange (optional)::
+
+The <<lua_class_TvbRange,`TvbRange`>> of bytes in the packet this tree item covers/represents.
+
+// function_arg_footer: tvbrange (optional)
+encoding::
+
+The field's encoding in the `TvbRange`.
+
+// function_arg_footer: encoding
+label (optional)::
+
+One or more strings to append to the created <<lua_class_TreeItem,`TreeItem`>>.
+
+// function_arg_footer: label (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The new child <<lua_class_TreeItem,`TreeItem`>>, the field's extracted value or nil, and offset or nil.
+
+// function_returns_footer: treeitem:add_packet_field
+// function_footer: treeitem_add_packet_field_protofield___tvbrange___encoding___label__
+
+// wslua_tree.c
+[#lua_fn_treeitem_add__protofield____tvbrange____value____label__]
+===== treeitem:add([protofield], [tvbrange], [value], [label])
+
+Adds a child item to this tree item, returning the new child <<lua_class_TreeItem,`TreeItem`>>.
+
+If the <<lua_class_ProtoField,`ProtoField`>> represents a numeric value (int, uint or float), then it's treated as a Big Endian (network order) value.
+
+This function has a complicated form: 'treeitem:add([protofield,] [tvbrange,] $$value], label$$)', such that if the first
+argument is a <<lua_class_ProtoField,`ProtoField`>> or a <<lua_class_Proto,`Proto`>>, the second argument is a <<lua_class_TvbRange,`TvbRange`>>, and a third argument is given, it's a value;
+but if the second argument is a non-<<lua_class_TvbRange,`TvbRange`>>, then it's the value (as opposed to filling that argument with 'nil',
+which is invalid for this function).  If the first argument is a non-<<lua_class_ProtoField,`ProtoField`>> and a non-<<lua_class_Proto,`Proto`>> then this argument can
+be either a <<lua_class_TvbRange,`TvbRange`>> or a label, and the value is not in use.
+
+[discrete]
+====== Example
+
+[source,lua]
+----
+    local proto_foo = Proto("foo", "Foo Protocol")
+    proto_foo.fields.bytes = ProtoField.bytes("foo.bytes", "Byte array")
+    proto_foo.fields.u16 = ProtoField.uint16("foo.u16", "Unsigned short", base.HEX)
+
+    function proto_foo.dissector(buf, pinfo, tree)
+            -- ignore packets less than 4 bytes long
+            if buf:len() < 4 then return end
+
+            -- ##############################################
+            -- # Assume buf(0,4) == {0x00, 0x01, 0x00, 0x02}
+            -- ##############################################
+
+            local t = tree:add( proto_foo, buf() )
+
+            -- Adds a byte array that shows as: "Byte array: 00010002"
+            t:add( proto_foo.fields.bytes, buf(0,4) )
+
+            -- Adds a byte array that shows as "Byte array: 313233"
+            -- (the ASCII char code of each character in "123")
+            t:add( proto_foo.fields.bytes, buf(0,4), "123" )
+
+            -- Adds a tree item that shows as: "Unsigned short: 0x0001"
+            t:add( proto_foo.fields.u16, buf(0,2) )
+
+            -- Adds a tree item that shows as: "Unsigned short: 0x0064"
+            t:add( proto_foo.fields.u16, buf(0,2), 100 )
+
+            -- Adds a tree item that shows as: "Unsigned short: 0x0064 ( big endian )"
+            t:add( proto_foo.fields.u16, buf(1,2), 100, nil, "(", nil, "big", 999, nil, "endian", nil, ")" )
+
+            -- LITTLE ENDIAN: Adds a tree item that shows as: "Unsigned short: 0x0100"
+            t:add_le( proto_foo.fields.u16, buf(0,2) )
+
+            -- LITTLE ENDIAN: Adds a tree item that shows as: "Unsigned short: 0x6400"
+            t:add_le( proto_foo.fields.u16, buf(0,2), 100 )
+
+            -- LITTLE ENDIAN: Adds a tree item that shows as: "Unsigned short: 0x6400 ( little endian )"
+            t:add_le( proto_foo.fields.u16, buf(1,2), 100, nil, "(", nil, "little", 999, nil, "endian", nil, ")" )
+    end
+
+    udp_table = DissectorTable.get("udp.port")
+    udp_table:add(7777, proto_foo)
+----
+
+[float]
+===== Arguments
+
+protofield (optional)::
+
+The <<lua_class_ProtoField,`ProtoField`>> field or <<lua_class_Proto,`Proto`>> protocol object to add to the tree.
+
+// function_arg_footer: protofield (optional)
+tvbrange (optional)::
+
+The <<lua_class_TvbRange,`TvbRange`>> of bytes in the packet this tree item covers/represents.
+
+// function_arg_footer: tvbrange (optional)
+value (optional)::
+
+The field's value, instead of the ProtoField/Proto one.
+
+// function_arg_footer: value (optional)
+label (optional)::
+
+One or more strings to use for the tree item label, instead of the ProtoField/Proto one.
+
+// function_arg_footer: label (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The new child TreeItem.
+
+// function_returns_footer: treeitem:add
+// function_footer: treeitem_add__protofield____tvbrange____value____label__
+
+// wslua_tree.c
+[#lua_fn_treeitem_add_le__protofield____tvbrange____value____label__]
+===== treeitem:add_le([protofield], [tvbrange], [value], [label])
+
+Adds a child item to this tree item, returning the new child <<lua_class_TreeItem,`TreeItem`>>.
+
+If the <<lua_class_ProtoField,`ProtoField`>> represents a numeric value (int, uint or float), then it's treated as a Little Endian value.
+
+This function has a complicated form: 'treeitem:add_le([protofield,] [tvbrange,] $$value], label$$)', such that if the first
+argument is a <<lua_class_ProtoField,`ProtoField`>> or a <<lua_class_Proto,`Proto`>>, the second argument is a <<lua_class_TvbRange,`TvbRange`>>, and a third argument is given, it's a value;
+but if the second argument is a non-<<lua_class_TvbRange,`TvbRange`>>, then it's the value (as opposed to filling that argument with 'nil',
+which is invalid for this function).  If the first argument is a non-<<lua_class_ProtoField,`ProtoField`>> and a non-<<lua_class_Proto,`Proto`>> then this argument can
+be either a <<lua_class_TvbRange,`TvbRange`>> or a label, and the value is not in use.
+
+[float]
+===== Arguments
+
+protofield (optional)::
+
+The ProtoField field or Proto protocol object to add to the tree.
+
+// function_arg_footer: protofield (optional)
+tvbrange (optional)::
+
+The TvbRange of bytes in the packet this tree item covers/represents.
+
+// function_arg_footer: tvbrange (optional)
+value (optional)::
+
+The field's value, instead of the ProtoField/Proto one.
+
+// function_arg_footer: value (optional)
+label (optional)::
+
+One or more strings to use for the tree item label, instead of the ProtoField/Proto one.
+
+// function_arg_footer: label (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The new child TreeItem.
+
+// function_returns_footer: treeitem:add_le
+// function_footer: treeitem_add_le__protofield____tvbrange____value____label__
+
+// wslua_tree.c
+[#lua_fn_treeitem_set_text_text_]
+===== treeitem:set_text(text)
+
+Sets the text of the label.
+
+This used to return nothing, but as of 1.11.3 it returns the same tree item to allow chained calls.
+
+[float]
+===== Arguments
+
+text::
+
+The text to be used.
+
+// function_arg_footer: text
+// end of function_args
+
+[float]
+===== Returns
+
+The same TreeItem.
+
+// function_returns_footer: treeitem:set_text
+// function_footer: treeitem_set_text_text_
+
+// wslua_tree.c
+[#lua_fn_treeitem_append_text_text_]
+===== treeitem:append_text(text)
+
+Appends text to the label.
+
+This used to return nothing, but as of 1.11.3 it returns the same tree item to allow chained calls.
+
+[float]
+===== Arguments
+
+text::
+
+The text to be appended.
+
+// function_arg_footer: text
+// end of function_args
+
+[float]
+===== Returns
+
+The same TreeItem.
+
+// function_returns_footer: treeitem:append_text
+// function_footer: treeitem_append_text_text_
+
+// wslua_tree.c
+[#lua_fn_treeitem_prepend_text_text_]
+===== treeitem:prepend_text(text)
+
+Prepends text to the label.
+
+This used to return nothing, but as of 1.11.3 it returns the same tree item to allow chained calls.
+
+[float]
+===== Arguments
+
+text::
+
+The text to be prepended.
+
+// function_arg_footer: text
+// end of function_args
+
+[float]
+===== Returns
+
+The same TreeItem.
+
+// function_returns_footer: treeitem:prepend_text
+// function_footer: treeitem_prepend_text_text_
+
+// wslua_tree.c
+[#lua_fn_treeitem_add_expert_info__group____severity____text__]
+===== treeitem:add_expert_info([group], [severity], [text])
+
+Sets the expert flags of the item and adds expert info to the packet.
+
+This function does *not* create a truly filterable expert info for a protocol.
+Instead you should use `TreeItem.add_proto_expert_info()`.
+
+Note: This function is provided for backwards compatibility only, and should not
+be used in new Lua code. It may be removed in the future. You should only
+use `TreeItem.add_proto_expert_info()`.
+
+[float]
+===== Arguments
+
+group (optional)::
+
+One of:
+`PI_CHECKSUM`,
+`PI_SEQUENCE`,
+`PI_RESPONSE_CODE`,
+`PI_REQUEST_CODE`,
+`PI_UNDECODED`,
+`PI_REASSEMBLE`,
+`PI_MALFORMED`,
+`PI_DEBUG`,
+`PI_PROTOCOL`,
+`PI_SECURITY`,
+`PI_COMMENTS_GROUP`,
+`PI_DECRYPTION`,
+`PI_ASSUMPTION`,
+`PI_DEPRECATED`,
+`PI_RECEIVE`,
+`PI_INTERFACE`,
+or `PI_DISSECTOR_BUG`.
+
+// function_arg_footer: group (optional)
+severity (optional)::
+
+One of:
+`PI_COMMENT`,
+`PI_CHAT`,
+`PI_NOTE`,
+`PI_WARN`,
+or `PI_ERROR`.
+
+// function_arg_footer: severity (optional)
+text (optional)::
+
+The text for the expert info display.
+
+// function_arg_footer: text (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The same TreeItem.
+
+// function_returns_footer: treeitem:add_expert_info
+// function_footer: treeitem_add_expert_info__group____severity____text__
+
+// wslua_tree.c
+[#lua_fn_treeitem_add_proto_expert_info_expert___text__]
+===== treeitem:add_proto_expert_info(expert, [text])
+
+Sets the expert flags of the tree item and adds expert info to the packet.
+
+[float]
+===== Arguments
+
+expert::
+
+The <<lua_class_ProtoExpert,`ProtoExpert`>> object to add to the tree.
+
+// function_arg_footer: expert
+text (optional)::
+
+Text for the expert info display
+(default is to use the registered
+text).
+
+// function_arg_footer: text (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The same TreeItem.
+
+// function_returns_footer: treeitem:add_proto_expert_info
+// function_footer: treeitem_add_proto_expert_info_expert___text__
+
+// wslua_tree.c
+[#lua_fn_treeitem_add_tvb_expert_info_expert__tvb___text__]
+===== treeitem:add_tvb_expert_info(expert, tvb, [text])
+
+Sets the expert flags of the tree item and adds expert info to the packet
+associated with the <<lua_class_Tvb,`Tvb`>> or <<lua_class_TvbRange,`TvbRange`>> bytes in the packet.
+
+[float]
+===== Arguments
+
+expert::
+
+The <<lua_class_ProtoExpert,`ProtoExpert`>> object to add to the tree.
+
+// function_arg_footer: expert
+tvb::
+
+The <<lua_class_Tvb,`Tvb`>> or <<lua_class_TvbRange,`TvbRange`>> object bytes to associate
+the expert info with.
+
+// function_arg_footer: tvb
+text (optional)::
+
+Text for the expert info display
+(default is to use the registered
+text).
+
+// function_arg_footer: text (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The same TreeItem.
+
+// function_returns_footer: treeitem:add_tvb_expert_info
+// function_footer: treeitem_add_tvb_expert_info_expert__tvb___text__
+
+// wslua_tree.c
+[#lua_fn_treeitem_set_generated__bool__]
+===== treeitem:set_generated([bool])
+
+Marks the <<lua_class_TreeItem,`TreeItem`>> as a generated field (with data inferred but not contained in the packet).
+
+This used to return nothing, but as of 1.11.3 it returns the same tree item to allow chained calls.
+
+[float]
+===== Arguments
+
+bool (optional)::
+
+A Lua boolean, which if `true` sets the <<lua_class_TreeItem,`TreeItem`>>
+generated flag, else clears it (default=true)
+
+// function_arg_footer: bool (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The same TreeItem.
+
+// function_returns_footer: treeitem:set_generated
+// function_footer: treeitem_set_generated__bool__
+
+// wslua_tree.c
+[#lua_fn_treeitem_set_hidden__bool__]
+===== treeitem:set_hidden([bool])
+
+Marks the <<lua_class_TreeItem,`TreeItem`>> as a hidden field (neither displayed nor used in filters).
+Deprecated
+
+This used to return nothing, but as of 1.11.3 it returns the same tree item to allow chained calls.
+
+[float]
+===== Arguments
+
+bool (optional)::
+
+A Lua boolean, which if `true` sets the <<lua_class_TreeItem,`TreeItem`>>
+hidden flag, else clears it. Default is `true`.
+
+// function_arg_footer: bool (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The same TreeItem.
+
+// function_returns_footer: treeitem:set_hidden
+// function_footer: treeitem_set_hidden__bool__
+
+// wslua_tree.c
+[#lua_fn_treeitem_set_len_len_]
+===== treeitem:set_len(len)
+
+Set <<lua_class_TreeItem,`TreeItem`>>'s length inside tvb, after it has already been created.
+
+This used to return nothing, but as of 1.11.3 it returns the same tree item to allow chained calls.
+
+[float]
+===== Arguments
+
+len::
+
+The length to be used.
+
+// function_arg_footer: len
+// end of function_args
+
+[float]
+===== Returns
+
+The same TreeItem.
+
+// function_returns_footer: treeitem:set_len
+// function_footer: treeitem_set_len_len_
+
+// wslua_tree.c
+[#lua_fn_treeitem_referenced_protofield_]
+===== treeitem:referenced(protofield)
+
+Checks if a <<lua_class_ProtoField,`ProtoField`>> or <<lua_class_Dissector,`Dissector`>> is referenced by a filter/tap/UI.
+
+If this function returns `false`, it means that the field (or dissector) does not need to be dissected
+and can be safely skipped. By skipping a field rather than dissecting it, the dissector will
+usually run faster since Wireshark will not do extra dissection work when it doesn't need the field.
+
+You can use this in conjunction with the TreeItem.visible attribute. This function will always return
+true when the TreeItem is visible. When it is not visible and the field is not referenced, you can
+speed up the dissection by not dissecting the field as it is not needed for display or filtering.
+
+This function takes one parameter that can be a <<lua_class_ProtoField,`ProtoField`>> or <<lua_class_Dissector,`Dissector`>>.
+The <<lua_class_Dissector,`Dissector`>> form is useful when you need to decide whether to call a sub-dissector.
+
+[float]
+===== Arguments
+
+protofield::
+
+The <<lua_class_ProtoField,`ProtoField`>> or <<lua_class_Dissector,`Dissector`>> to check if referenced.
+
+// function_arg_footer: protofield
+// end of function_args
+
+[float]
+===== Returns
+
+A boolean indicating if the ProtoField/Dissector is referenced
+
+// function_returns_footer: treeitem:referenced
+// function_footer: treeitem_referenced_protofield_
+
+// wslua_tree.c
+[#lua_fn_treeitem___tostring__]
+===== treeitem:__tostring()
+
+Returns string debug information about the <<lua_class_TreeItem,`TreeItem`>>.
+
+// function_footer: treeitem___tostring__
+
+[#lua_class_attrib_treeitem_text]
+===== treeitem.text
+
+Mode: Retrieve or assign.
+
+Set/get the <<lua_class_TreeItem,`TreeItem`>>'s display string (string).
+
+For the getter, if the TreeItem has no display string, then nil is returned.
+
+// End treeitem.text
+
+[#lua_class_attrib_treeitem_visible]
+===== treeitem.visible
+
+Mode: Retrieve only.
+
+Get the <<lua_class_TreeItem,`TreeItem`>>'s subtree visibility status (boolean).
+
+// End treeitem.visible
+
+[#lua_class_attrib_treeitem_generated]
+===== treeitem.generated
+
+Mode: Retrieve or assign.
+
+Set/get the <<lua_class_TreeItem,`TreeItem`>>'s generated state (boolean).
+
+// End treeitem.generated
+
+[#lua_class_attrib_treeitem_hidden]
+===== treeitem.hidden
+
+Mode: Retrieve or assign.
+
+Set/get <<lua_class_TreeItem,`TreeItem`>>'s hidden state (boolean).
+
+// End treeitem.hidden
+
+[#lua_class_attrib_treeitem_len]
+===== treeitem.len
+
+Mode: Retrieve or assign.
+
+Set/get <<lua_class_TreeItem,`TreeItem`>>'s length inside tvb, after it has already been created.
+
+// End treeitem.len
+
+// class_footer: TreeItem
+// end of module

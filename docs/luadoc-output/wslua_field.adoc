@@ -1,0 +1,353 @@
+// wslua_field.c
+[#lua_module_Field]
+=== Obtaining Dissection Data
+
+// wslua_field.c
+[#lua_class_Field]
+==== Field
+
+A Field extractor to obtain field values. A `Field` object can only be created *outside* of
+the callback functions of dissectors, post-dissectors, heuristic-dissectors, and taps.
+
+Once created, it is used *inside* the callback functions, to generate a `FieldInfo` object.
+
+// wslua_field.c
+[#lua_fn_Field_new_fieldname_]
+===== Field.new(fieldname)
+
+Create a Field extractor.
+
+[float]
+===== Arguments
+
+fieldname::
+
+The filter name of the field (e.g. ip.addr)
+
+// function_arg_footer: fieldname
+// end of function_args
+
+[float]
+===== Returns
+
+The field extractor
+
+// function_returns_footer: Field.new
+[float]
+===== Errors
+
+* A Field extractor must be defined before Taps or Dissectors get called
+
+// function_errors_footer: Field.new
+// function_footer: Field_new_fieldname_
+
+// wslua_field.c
+[#lua_fn_Field_list__]
+===== Field.list()
+
+Gets a Lua array table of all registered field filter names.
+
+NOTE: This is an expensive operation, and should only be used for troubleshooting.
+
+[float]
+===== Returns
+
+The array table of field filter names
+
+// function_returns_footer: Field.list
+// function_footer: Field_list__
+
+// wslua_field.c
+[#lua_fn_field___call__]
+===== field:__call()
+
+Obtain all values (see `FieldInfo`) for this field.
+
+[float]
+===== Returns
+
+All the values of this field
+
+// function_returns_footer: field:__call
+[float]
+===== Errors
+
+* Fields cannot be used outside dissectors or taps
+
+// function_errors_footer: field:__call
+// function_footer: field___call__
+
+// wslua_field.c
+[#lua_fn_field___tostring__]
+===== field:__tostring()
+
+Obtain a string with the field filter name.
+
+// function_footer: field___tostring__
+
+[#lua_class_attrib_field_name]
+===== field.name
+
+Mode: Retrieve only.
+
+The filter name of this field, or nil.
+
+// End field.name
+
+[#lua_class_attrib_field_display]
+===== field.display
+
+Mode: Retrieve only.
+
+The full display name of this field, or nil.
+
+// End field.display
+
+[#lua_class_attrib_field_type]
+===== field.type
+
+Mode: Retrieve only.
+
+The `ftype` of this field, or nil.
+
+// End field.type
+
+// class_footer: Field
+
+// wslua_field.c
+[#lua_class_FieldInfo]
+==== FieldInfo
+
+An extracted Field from dissected packet data. A `FieldInfo` object can only be used within
+the callback functions of dissectors, post-dissectors, heuristic-dissectors, and taps.
+
+A `FieldInfo` can be called on either existing Wireshark fields by using either `Field.new()`
+or `Field()` before-hand, or it can be called on new fields created by Lua from a `ProtoField`.
+
+// wslua_field.c
+[#lua_fn_fieldinfo___len__]
+===== fieldinfo:__len()
+
+Obtain the Length of the field
+
+// function_footer: fieldinfo___len__
+
+// wslua_field.c
+[#lua_fn_fieldinfo___unm__]
+===== fieldinfo:__unm()
+
+Obtain the Offset of the field
+
+// function_footer: fieldinfo___unm__
+
+// wslua_field.c
+[#lua_fn_fieldinfo___call__]
+===== fieldinfo:__call()
+
+Obtain the Value of the field.
+
+Previous to 1.11.4, this function retrieved the value for most field types,
+but for `ftypes.UINT_BYTES` it retrieved the `ByteArray` of the field's entire `TvbRange`.
+In other words, it returned a `ByteArray` that included the leading length byte(s),
+instead of just the *value* bytes. That was a bug, and has been changed in 1.11.4.
+Furthermore, it retrieved an `ftypes.GUID` as a `ByteArray`, which is also incorrect.
+
+If you wish to still get a `ByteArray` of the `TvbRange`, use `fieldinfo.range`
+to get the `TvbRange`, and then use `tvbrange:bytes()` to convert it to a `ByteArray`.
+
+// function_footer: fieldinfo___call__
+
+// wslua_field.c
+[#lua_fn_fieldinfo___tostring__]
+===== fieldinfo:__tostring()
+
+The string representation of the field.
+
+// function_footer: fieldinfo___tostring__
+
+// wslua_field.c
+[#lua_fn_fieldinfo___eq__]
+===== fieldinfo:__eq()
+
+Checks whether lhs is within rhs.
+
+// function_footer: fieldinfo___eq__
+
+// wslua_field.c
+[#lua_fn_fieldinfo___le__]
+===== fieldinfo:__le()
+
+Checks whether the end byte of lhs is before the end of rhs.
+
+[float]
+===== Errors
+
+* Data source must be the same for both fields
+
+// function_errors_footer: fieldinfo:__le
+// function_footer: fieldinfo___le__
+
+// wslua_field.c
+[#lua_fn_fieldinfo___lt__]
+===== fieldinfo:__lt()
+
+Checks whether the end byte of lhs is before the beginning of rhs.
+
+[float]
+===== Errors
+
+* Data source must be the same for both fields
+
+// function_errors_footer: fieldinfo:__lt
+// function_footer: fieldinfo___lt__
+
+[#lua_class_attrib_fieldinfo_len]
+===== fieldinfo.len
+
+Mode: Retrieve only.
+
+The length of this field.
+
+// End fieldinfo.len
+
+[#lua_class_attrib_fieldinfo_offset]
+===== fieldinfo.offset
+
+Mode: Retrieve only.
+
+The offset of this field.
+
+// End fieldinfo.offset
+
+[#lua_class_attrib_fieldinfo_value]
+===== fieldinfo.value
+
+Mode: Retrieve only.
+
+The value of this field.
+
+// End fieldinfo.value
+
+[#lua_class_attrib_fieldinfo_label]
+===== fieldinfo.label
+
+Mode: Retrieve only.
+
+The string representing this field.
+
+// End fieldinfo.label
+
+[#lua_class_attrib_fieldinfo_display]
+===== fieldinfo.display
+
+Mode: Retrieve only.
+
+The string display of this field as seen in GUI.
+
+// End fieldinfo.display
+
+[#lua_class_attrib_fieldinfo_type]
+===== fieldinfo.type
+
+Mode: Retrieve only.
+
+The internal field type, a number which
+matches one of the `ftype` values.
+
+// End fieldinfo.type
+
+[#lua_class_attrib_fieldinfo_source]
+===== fieldinfo.source
+
+Mode: Retrieve only.
+
+The source `Tvb` object the `FieldInfo` is derived
+from, or nil if there is none.
+
+// End fieldinfo.source
+
+[#lua_class_attrib_fieldinfo_range]
+===== fieldinfo.range
+
+Mode: Retrieve only.
+
+The `TvbRange` covering the bytes of this field in a Tvb or nil if there is none.
+
+// End fieldinfo.range
+
+[#lua_class_attrib_fieldinfo_generated]
+===== fieldinfo.generated
+
+Mode: Retrieve only.
+
+Whether this field was marked as generated (boolean).
+
+// End fieldinfo.generated
+
+[#lua_class_attrib_fieldinfo_hidden]
+===== fieldinfo.hidden
+
+Mode: Retrieve only.
+
+Whether this field was marked as hidden (boolean).
+
+// End fieldinfo.hidden
+
+[#lua_class_attrib_fieldinfo_is_url]
+===== fieldinfo.is_url
+
+Mode: Retrieve only.
+
+Whether this field was marked as being a URL (boolean).
+
+// End fieldinfo.is_url
+
+[#lua_class_attrib_fieldinfo_little_endian]
+===== fieldinfo.little_endian
+
+Mode: Retrieve only.
+
+Whether this field is little-endian encoded (boolean).
+
+// End fieldinfo.little_endian
+
+[#lua_class_attrib_fieldinfo_big_endian]
+===== fieldinfo.big_endian
+
+Mode: Retrieve only.
+
+Whether this field is big-endian encoded (boolean).
+
+// End fieldinfo.big_endian
+
+[#lua_class_attrib_fieldinfo_name]
+===== fieldinfo.name
+
+Mode: Retrieve only.
+
+The filter name of this field.
+
+// End fieldinfo.name
+
+// class_footer: FieldInfo
+[#global_functions_Field]
+==== Global Functions
+
+// wslua_field.c
+[#lua_fn_all_field_infos__]
+===== all_field_infos()
+
+Obtain all fields from the current tree.  Note this only gets whatever fields the underlying
+dissectors have filled in for this packet at this time - there may be fields applicable to
+the packet that simply aren't being filled in because at this time they're not needed for anything.
+This function only gets what the C-side code has currently populated, not the full list.
+
+[float]
+===== Errors
+
+* Cannot be called outside a listener or dissector
+
+// function_errors_footer: all_field_infos
+// function_footer: all_field_infos__
+// Global function
+// end of module

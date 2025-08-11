@@ -1,0 +1,1063 @@
+// wslua_frame_info.c
+[#lua_module_File]
+=== Custom File Format Reading And Writing
+
+The classes/functions defined in this section allow you to create your own
+custom Lua-based "capture" file reader, or writer, or both.
+
+// wslua_frame_info.c
+[#lua_class_CaptureInfo]
+==== CaptureInfo
+
+A `CaptureInfo` object, passed into Lua as an argument by `FileHandler` callback
+function `read_open()`, `read()`, `seek_read()`, `seq_read_close()`, and `read_close()`.
+This object represents capture file data and meta-data (data about the
+capture file) being read into Wireshark/TShark.
+
+This object's fields can be written-to by Lua during the read-based function callbacks.
+In other words, when the Lua plugin's `FileHandler.read_open()` function is invoked, a
+`CaptureInfo` object will be passed in as one of the arguments, and its fields
+should be written to by your Lua code to tell Wireshark about the capture.
+
+// wslua_capture_info.c
+[#lua_fn_captureinfo___tostring__]
+===== captureinfo:__tostring()
+
+Generates a string of debug info for the CaptureInfo
+
+[float]
+===== Returns
+
+String of debug information.
+
+// function_returns_footer: captureinfo:__tostring
+// function_footer: captureinfo___tostring__
+
+[#lua_class_attrib_captureinfo_encap]
+===== captureinfo.encap
+
+Mode: Retrieve or assign.
+
+The packet encapsulation type for the whole file.
+
+See `wtap_encaps` for available types.  Set to `wtap_encaps.PER_PACKET` if packets can
+have different types, then later set `FrameInfo.encap` for each packet during `read()`/`seek_read()`.
+
+// End captureinfo.encap
+
+[#lua_class_attrib_captureinfo_time_precision]
+===== captureinfo.time_precision
+
+Mode: Retrieve or assign.
+
+The precision of the packet timestamps in the file.
+
+See `wtap_file_tsprec` for available precisions.
+
+// End captureinfo.time_precision
+
+[#lua_class_attrib_captureinfo_snapshot_length]
+===== captureinfo.snapshot_length
+
+Mode: Retrieve or assign.
+
+The maximum packet length that could be recorded.
+
+Setting it to `0` means unknown.
+
+// End captureinfo.snapshot_length
+
+[#lua_class_attrib_captureinfo_comment]
+===== captureinfo.comment
+
+Mode: Retrieve or assign.
+
+A string comment for the whole capture file,
+or nil if there is no `comment`.
+
+// End captureinfo.comment
+
+[#lua_class_attrib_captureinfo_hardware]
+===== captureinfo.hardware
+
+Mode: Retrieve or assign.
+
+A string containing the description of
+the hardware used to create the capture, or nil if there is no `hardware` string.
+
+// End captureinfo.hardware
+
+[#lua_class_attrib_captureinfo_os]
+===== captureinfo.os
+
+Mode: Retrieve or assign.
+
+A string containing the name of
+the operating system used to create the capture, or nil if there is no `os` string.
+
+// End captureinfo.os
+
+[#lua_class_attrib_captureinfo_user_app]
+===== captureinfo.user_app
+
+Mode: Retrieve or assign.
+
+A string containing the name of
+the application used to create the capture, or nil if there is no `user_app` string.
+
+// End captureinfo.user_app
+
+[#lua_class_attrib_captureinfo_hosts]
+===== captureinfo.hosts
+
+Mode: Assign only.
+
+Sets resolved ip-to-hostname information.
+
+The value set must be a Lua table of two key-ed names: `ipv4_addresses` and `ipv6_addresses`.
+The value of each of these names are themselves array tables, of key-ed tables, such that the inner table has a key
+`addr` set to the raw 4-byte or 16-byte IP address Lua string and a `name` set to the resolved name.
+
+For example, if the capture file identifies one resolved IPv4 address of 1.2.3.4 to `foo.com`, then you must set
+`CaptureInfo.hosts` to a table of:
+
+[source,lua]
+----
+    { ipv4_addresses = { { addr = "\01\02\03\04", name = "foo.com" } } }
+----
+
+Note that either the `ipv4_addresses` or the `ipv6_addresses` table, or both, may be empty or nil.
+
+// End captureinfo.hosts
+
+[#lua_class_attrib_captureinfo_private_table]
+===== captureinfo.private_table
+
+Mode: Retrieve or assign.
+
+A private Lua value unique to this file.
+
+The `private_table` is a field you set/get with your own Lua table.
+This is provided so that a Lua script can save per-file reading/writing
+state, because multiple files can be opened and read at the same time.
+
+For example, if the user issued a reload-file command, or Lua called the
+`reload()` function, then the current capture file is still open while a new one
+is being opened, and thus Wireshark will invoke `read_open()` while the previous
+capture file has not caused `read_close()` to be called; and if the `read_open()`
+succeeds then `read_close()` will be called right after that for the previous
+file, rather than the one just opened. Thus the Lua script can use this
+`private_table` to store a table of values specific to each file, by setting
+this `private_table` in the `read_open()` function, which it can then later get back
+inside its `read()`, `seek_read()`, and `read_close()` functions.
+
+// End captureinfo.private_table
+
+// class_footer: CaptureInfo
+
+// wslua_frame_info.c
+[#lua_class_CaptureInfoConst]
+==== CaptureInfoConst
+
+A `CaptureInfoConst` object, passed into Lua as an argument to the `FileHandler` callback
+function `write_open()`.
+
+This object represents capture file data and meta-data (data about the
+capture file) for the current capture in Wireshark/TShark.
+
+This object's fields are read-from when used by `write_open` function callback.
+In other words, when the Lua plugin's FileHandler `write_open` function is invoked, a
+`CaptureInfoConst` object will be passed in as one of the arguments, and its fields
+should be read from by your Lua code to get data about the capture that needs to be written.
+
+// wslua_capture_info.c
+[#lua_fn_captureinfoconst___tostring__]
+===== captureinfoconst:__tostring()
+
+Generates a string of debug info for the CaptureInfoConst
+
+[float]
+===== Returns
+
+String of debug information.
+
+// function_returns_footer: captureinfoconst:__tostring
+// function_footer: captureinfoconst___tostring__
+
+[#lua_class_attrib_captureinfoconst_type]
+===== captureinfoconst.type
+
+Mode: Retrieve only.
+
+The file type.
+
+// End captureinfoconst.type
+
+[#lua_class_attrib_captureinfoconst_snapshot_length]
+===== captureinfoconst.snapshot_length
+
+Mode: Retrieve only.
+
+The maximum packet length that is actually recorded (vs. the original
+length of any given packet on-the-wire). A value of `0` means the snapshot length is unknown or there is no one
+such length for the whole file.
+
+// End captureinfoconst.snapshot_length
+
+[#lua_class_attrib_captureinfoconst_encap]
+===== captureinfoconst.encap
+
+Mode: Retrieve only.
+
+The packet encapsulation type for the whole file.
+
+See `wtap_encaps` for available types.  It is set to `wtap_encaps.PER_PACKET` if packets can
+have different types, in which case each Frame identifies its type, in `FrameInfo.packet_encap`.
+
+// End captureinfoconst.encap
+
+[#lua_class_attrib_captureinfoconst_comment]
+===== captureinfoconst.comment
+
+Mode: Retrieve or assign.
+
+A comment for the whole capture file, if the
+`wtap_presence_flags.COMMENTS` was set in the presence flags; nil if there is no comment.
+
+// End captureinfoconst.comment
+
+[#lua_class_attrib_captureinfoconst_hardware]
+===== captureinfoconst.hardware
+
+Mode: Retrieve only.
+
+A string containing the description of
+the hardware used to create the capture, or nil if there is no hardware string.
+
+// End captureinfoconst.hardware
+
+[#lua_class_attrib_captureinfoconst_os]
+===== captureinfoconst.os
+
+Mode: Retrieve only.
+
+A string containing the name of
+the operating system used to create the capture, or nil if there is no os string.
+
+// End captureinfoconst.os
+
+[#lua_class_attrib_captureinfoconst_user_app]
+===== captureinfoconst.user_app
+
+Mode: Retrieve only.
+
+A string containing the name of
+the application used to create the capture, or nil if there is no user_app string.
+
+// End captureinfoconst.user_app
+
+[#lua_class_attrib_captureinfoconst_hosts]
+===== captureinfoconst.hosts
+
+Mode: Retrieve only.
+
+A ip-to-hostname Lua table of two key-ed names: `ipv4_addresses` and `ipv6_addresses`.
+The value of each of these names are themselves array tables, of key-ed tables, such that the inner table has a key
+`addr` set to the raw 4-byte or 16-byte IP address Lua string and a `name` set to the resolved name.
+
+For example, if the current capture has one resolved IPv4 address of 1.2.3.4 to `foo.com`, then getting
+`CaptureInfoConst.hosts` will get a table of:
+
+[source,lua]
+----
+    { ipv4_addresses = { { addr = "\01\02\03\04", name = "foo.com" } }, ipv6_addresses = { } }
+----
+
+Note that either the `ipv4_addresses` or the `ipv6_addresses` table, or both, may be empty, however they will not
+be nil.
+
+// End captureinfoconst.hosts
+
+[#lua_class_attrib_captureinfoconst_private_table]
+===== captureinfoconst.private_table
+
+Mode: Retrieve or assign.
+
+A private Lua value unique to this file.
+
+The `private_table` is a field you set/get with your own Lua table.
+This is provided so that a Lua script can save per-file reading/writing
+state, because multiple files can be opened and read at the same time.
+
+For example, if two Lua scripts issue a `Dumper:new_for_current()` call and the
+current file happens to use your script's writer, then the Wireshark will invoke
+`write_open()` while the previous capture file has not had `write_close()` called.
+Thus the Lua script can use this `private_table` to store a table of values
+specific to each file, by setting this `private_table` in the write_open()
+function, which it can then later get back inside its `write()`, and `write_close()`
+functions.
+
+// End captureinfoconst.private_table
+
+// class_footer: CaptureInfoConst
+
+// wslua_frame_info.c
+[#lua_class_File]
+==== File
+
+A `File` object, passed into Lua as an argument by FileHandler callback
+functions (e.g., `read_open`, `read`, `write`, etc.).  This behaves similarly to the
+Lua `io` library's `file` object, returned when calling `io.open()`, *except*
+in this case you cannot call `file:close()`, `file:open()`, nor `file:setvbuf()`,
+since Wireshark/TShark manages the opening and closing of files.
+You also cannot use the '`io`' library itself on this object, i.e. you cannot
+do `io.read(file, 4)`.  Instead, use this `File` with the object-oriented style
+calling its methods, i.e. `myfile:read(4)`. (see later example)
+
+The purpose of this object is to hide the internal complexity of how Wireshark
+handles files, and instead provide a Lua interface that is familiar, by mimicking
+the `io` library. The reason true/raw `io` files cannot be used is because Wireshark
+does many things under the hood, such as compress the file, or write to `stdout`,
+or various other things based on configuration/commands.
+
+When a `File` object is passed in through reading-based callback functions, such as
+`read_open()`, `read()`, and `read_close()`, then the File object's `write()` and `flush()`
+functions are not usable and will raise an error if used.
+
+When a `File` object is passed in through writing-based callback functions, such as
+`write_open()`, `write()`, and `write_close()`, then the File object's `read()` and `lines()`
+functions are not usable and will raise an error if used.
+
+Note: A `File` object should never be stored/saved beyond the scope of the callback function
+it is passed in to.
+
+For example:
+
+[source,lua]
+----
+    function myfilehandler.read_open(file, capture)
+        local position = file:seek()
+
+        -- read 24 bytes
+        local line = file:read(24)
+
+        -- do stuff
+
+        -- it's not our file type, seek back (unnecessary but just to show it...)
+        file:seek("set",position)
+
+        -- return false because it's not our file type
+        return false
+    end
+----
+
+// wslua_file.c
+[#lua_fn_file_read__]
+===== file:read()
+
+Reads from the File, similar to Lua's `file:read()`.  See Lua 5.x ref manual for `file:read()`.
+
+// function_footer: file_read__
+
+// wslua_file.c
+[#lua_fn_file_seek__]
+===== file:seek()
+
+Seeks in the File, similar to Lua's `file:seek()`.  See Lua 5.x ref manual for `file:seek()`.
+
+[float]
+===== Returns
+
+The current file cursor position as a number.
+
+// function_returns_footer: file:seek
+// function_footer: file_seek__
+
+// wslua_file.c
+[#lua_fn_file_lines__]
+===== file:lines()
+
+Lua iterator function for retrieving ASCII File lines, similar to Lua's `file:lines()`.  See Lua 5.x ref manual for `file:lines()`.
+
+// function_footer: file_lines__
+
+// wslua_file.c
+[#lua_fn_file_write__]
+===== file:write()
+
+Writes to the File, similar to Lua's file:write().  See Lua 5.x ref manual for file:write().
+
+// function_footer: file_write__
+
+// wslua_file.c
+[#lua_fn_file___tostring__]
+===== file:__tostring()
+
+Generates a string of debug info for the File object
+
+[float]
+===== Returns
+
+String of debug information.
+
+// function_returns_footer: file:__tostring
+// function_footer: file___tostring__
+
+[#lua_class_attrib_file_compressed]
+===== file.compressed
+
+Mode: Retrieve only.
+
+Whether the File is compressed or not.
+
+See `wtap_encaps` for available types.  Set to `wtap_encaps.PER_PACKET` if packets can
+have different types, then later set `FrameInfo.encap` for each packet during read()/seek_read().
+
+// End file.compressed
+
+// class_footer: File
+
+// wslua_frame_info.c
+[#lua_class_FileHandler]
+==== FileHandler
+
+A FileHandler object, created by a call to FileHandler.new(arg1, arg2, ...).
+The FileHandler object lets you create a file-format reader, or writer, or
+both, by setting your own read_open/read or write_open/write functions.
+
+// wslua_file_handler.c
+[#lua_fn_FileHandler_new_description__name__internal_description__type_]
+===== FileHandler.new(description, name, internal_description, type)
+
+Creates a new FileHandler
+
+[float]
+===== Arguments
+
+description::
+
+A description of the file type, for display purposes only. E.g., "Wireshark - pcapng"
+
+// function_arg_footer: description
+name::
+
+The file type name, used to look up the file type in various places. E.g., "pcapng". Note: The name cannot already be in use.
+
+// function_arg_footer: name
+internal_description::
+
+Descriptive text about this file format, for internal display purposes only
+
+// function_arg_footer: internal_description
+type::
+
+The type of FileHandler, "r"/"w"/"rw" for reader/writer/both, include "m" for magic, "s" for strong heuristic
+
+// function_arg_footer: type
+// end of function_args
+
+[float]
+===== Returns
+
+The newly created FileHandler object
+
+// function_returns_footer: FileHandler.new
+// function_footer: FileHandler_new_description__name__internal_description__type_
+
+// wslua_file_handler.c
+[#lua_fn_filehandler___tostring__]
+===== filehandler:__tostring()
+
+Generates a string of debug info for the FileHandler
+
+[float]
+===== Returns
+
+String of debug information.
+
+// function_returns_footer: filehandler:__tostring
+// function_footer: filehandler___tostring__
+
+[#lua_class_attrib_filehandler_read_open]
+===== filehandler.read_open
+
+Mode: Assign only.
+
+The Lua function to be called when Wireshark opens a file for reading.
+
+When later called by Wireshark, the Lua function will be given:
+
+1. A `File` object
+2. A `CaptureInfo` object
+
+The purpose of the Lua function set to this `read_open` field is to check if the file Wireshark is opening is of its type,
+for example by checking for magic numbers or trying to parse records in the file, etc.  The more can be verified
+the better, because Wireshark tries all file readers until it finds one that accepts the file, so accepting an
+incorrect file prevents other file readers from reading their files.
+
+The called Lua function should return true if the file is its type (it accepts it), false if not.  The Lua
+function must also set the File offset position (using `file:seek()`) to where it wants it to be for its first
+`read()` call.
+
+// End filehandler.read_open
+
+[#lua_class_attrib_filehandler_read]
+===== filehandler.read
+
+Mode: Assign only.
+
+The Lua function to be called when Wireshark wants to read a packet from the file.
+
+When later called by Wireshark, the Lua function will be given:
+
+1. A `File` object
+2. A `CaptureInfo` object
+3. A `FrameInfo` object
+
+The purpose of the Lua function set to this `read` field is to read the next packet from the file, and setting the parsed/read
+packet into the frame buffer using `FrameInfo.data = foo` or `FrameInfo:read_data(file, frame.captured_length)`.
+
+The called Lua function should return the file offset/position number where the packet begins, or false if it hit an
+error.  The file offset will be saved by Wireshark and passed into the set `seek_read()` Lua function later.
+
+// End filehandler.read
+
+[#lua_class_attrib_filehandler_seek_read]
+===== filehandler.seek_read
+
+Mode: Assign only.
+
+The Lua function to be called when Wireshark wants to read a packet from the file at the given offset.
+
+When later called by Wireshark, the Lua function will be given:
+
+1. A `File` object
+2. A `CaptureInfo` object
+3. A `FrameInfo` object
+4. The file offset number previously set by the `read()` function call
+
+The called Lua function should return true if the read was successful, or false if it hit an error.
+Since 2.4.0, a number is also acceptable to signal success, this allows for reuse of `FileHandler:read`:
+
+[source,lua]
+----
+    local function fh_read(file, capture, frame) ... end
+    myfilehandler.read = fh_read
+
+    function myfilehandler.seek_read(file, capture, frame, offset)
+        if not file:seek("set", offset) then
+            -- Seeking failed, return failure
+            return false
+        end
+
+        -- Now try to read one frame
+        return fh_read(file, capture, frame)
+    end
+----
+
+Since 3.6.0, it's possible to omit the `FileHandler:seek_read()` function to get a default seek_read implementation.
+
+// End filehandler.seek_read
+
+[#lua_class_attrib_filehandler_read_close]
+===== filehandler.read_close
+
+Mode: Assign only.
+
+The Lua function to be called when Wireshark wants to close the read file completely.
+
+When later called by Wireshark, the Lua function will be given:
+
+1. A `File` object
+2. A `CaptureInfo` object
+
+It is not necessary to set this field to a Lua function - FileHandler can be registered without doing so - it
+is available in case there is memory/state to clear in your script when the file is closed.
+
+// End filehandler.read_close
+
+[#lua_class_attrib_filehandler_seq_read_close]
+===== filehandler.seq_read_close
+
+Mode: Assign only.
+
+The Lua function to be called when Wireshark wants to close the sequentially-read file.
+
+When later called by Wireshark, the Lua function will be given:
+
+1. A `File` object
+2. A `CaptureInfo` object
+
+It is not necessary to set this field to a Lua
+function - FileHandler can be registered without doing so - it is available in case there is memory/state to clear in your script
+when the file is closed for the sequential reading portion.  After this point, there will be no more calls to `read()`, only `seek_read()`.
+
+// End filehandler.seq_read_close
+
+[#lua_class_attrib_filehandler_can_write_encap]
+===== filehandler.can_write_encap
+
+Mode: Assign only.
+
+The Lua function to be called when Wireshark wants to write a file,
+by checking if this file writer can handle the wtap packet encapsulation(s).
+
+When later called by Wireshark, the Lua function will be given a Lua number, which matches one of the encapsulations
+in the Lua `wtap_encaps` table.  This might be the `wtap_encap.PER_PACKET` number, meaning the capture contains multiple
+encapsulation types, and the file reader should only return true if it can handle multiple encap types in one file. The
+function will then be called again, once for each encap type in the file, to make sure it can write each one.
+
+If the Lua file writer can write the given type of encapsulation into a file, then it returns the boolean true, else false.
+
+// End filehandler.can_write_encap
+
+[#lua_class_attrib_filehandler_write_open]
+===== filehandler.write_open
+
+Mode: Assign only.
+
+The Lua function to be called when Wireshark opens a file for writing.
+
+When later called by Wireshark, the Lua function will be given:
+
+1. A `File` object
+2. A `CaptureInfoConst` object
+
+The purpose of the Lua function set to this `write_open` field is similar to the read_open callback function:
+to initialize things necessary for writing the capture to a file. For example, if the output file format has a
+file header, then the file header should be written within this write_open function.
+
+The called Lua function should return true on success, or false if it hit an error.
+
+Also make sure to set the `FileHandler.write` (and potentially `FileHandler.write_finish`) functions before
+returning true from this function.
+
+// End filehandler.write_open
+
+[#lua_class_attrib_filehandler_write]
+===== filehandler.write
+
+Mode: Assign only.
+
+The Lua function to be called when Wireshark wants to write a packet to the file.
+
+When later called by Wireshark, the Lua function will be given:
+
+1. A `File` object
+2. A `CaptureInfoConst` object
+3. A `FrameInfoConst` object of the current frame/packet to be written
+
+The purpose of the Lua function set to this `write` field is to write the next packet to the file.
+
+The called Lua function should return true on success, or false if it hit an error.
+
+// End filehandler.write
+
+[#lua_class_attrib_filehandler_write_finish]
+===== filehandler.write_finish
+
+Mode: Assign only.
+
+The Lua function to be called when Wireshark wants to close the written file.
+
+When later called by Wireshark, the Lua function will be given:
+
+1. A `File` object
+2. A `CaptureInfoConst` object
+
+It is not necessary to set this field to a Lua function - `FileHandler` can be registered without doing so - it is available
+in case there is memory/state to clear in your script when the file is closed.
+
+// End filehandler.write_finish
+
+[#lua_class_attrib_filehandler_type]
+===== filehandler.type
+
+Mode: Retrieve only.
+
+The internal file type.  This is automatically set with a new
+number when the FileHandler is registered.
+
+// End filehandler.type
+
+[#lua_class_attrib_filehandler_extensions]
+===== filehandler.extensions
+
+Mode: Retrieve or assign.
+
+One or more semicolon-separated file extensions that this file type usually uses.
+
+For readers using heuristics to determine file type, Wireshark will try the readers of the file's
+extension first, before trying other readers.  But ultimately Wireshark tries all file readers
+for any file extension, until it finds one that accepts the file.
+
+(Since 2.6) For writers, the first extension is used to suggest the default file extension.
+
+// End filehandler.extensions
+
+[#lua_class_attrib_filehandler_writing_must_seek]
+===== filehandler.writing_must_seek
+
+Mode: Retrieve or assign.
+
+True if the ability to seek is required when writing
+this file format, else false.
+
+This will be checked by Wireshark when writing out to compressed
+file formats, because seeking is not possible with compressed files. Usually a file writer only
+needs to be able to seek if it needs to go back in the file to change something, such as a block or
+file length value earlier in the file.
+
+// End filehandler.writing_must_seek
+
+[#lua_class_attrib_filehandler_writes_name_resolution]
+===== filehandler.writes_name_resolution
+
+Mode: Retrieve or assign.
+
+True if the file format supports name resolution
+records, else false.
+
+// End filehandler.writes_name_resolution
+
+[#lua_class_attrib_filehandler_supported_comment_types]
+===== filehandler.supported_comment_types
+
+Mode: Retrieve or assign.
+
+Set to the bit-wise OR'ed number representing
+the type of comments the file writer supports writing, based on the numbers in the `wtap_comments` table.
+
+// End filehandler.supported_comment_types
+
+// class_footer: FileHandler
+
+// wslua_frame_info.c
+[#lua_class_FrameInfo]
+==== FrameInfo
+
+A FrameInfo object, passed into Lua as an argument by FileHandler callback
+functions (e.g., `read`, `seek_read`, etc.).
+
+This object represents frame data and meta-data (data about the frame/packet)
+for a given `read`/`seek_read`/`write`++'++s frame.
+
+This object's fields are written-to/set when used by read function callbacks, and
+read-from/get when used by file write function callbacks.  In other words, when
+the Lua plugin's FileHandler `read`/`seek_read`/etc. functions are invoked, a
+FrameInfo object will be passed in as one of the arguments, and its fields
+should be written-to/set based on the frame information read from the file;
+whereas when the Lua plugin's `FileHandler.write()` function is invoked, the
+`FrameInfo` object passed in should have its fields read-from/get, to write that
+frame information to the file.
+
+// wslua_frame_info.c
+[#lua_fn_frameinfo___tostring__]
+===== frameinfo:__tostring()
+
+Generates a string of debug info for the FrameInfo
+
+[float]
+===== Returns
+
+String of debug information.
+
+// function_returns_footer: frameinfo:__tostring
+// function_footer: frameinfo___tostring__
+
+// wslua_frame_info.c
+[#lua_fn_frameinfo_read_data_file__length_]
+===== frameinfo:read_data(file, length)
+
+Tells Wireshark to read directly from given file into frame data buffer, for length bytes. Returns true if succeeded, else false.
+
+[float]
+===== Arguments
+
+file::
+
+The File object userdata, provided by Wireshark previously in a reading-based callback.
+
+// function_arg_footer: file
+length::
+
+The number of bytes to read from the file at the current cursor position.
+
+// function_arg_footer: length
+// end of function_args
+
+[float]
+===== Returns
+
+True if succeeded, else returns false along with the error number and string error description.
+
+A Lua string of the frame buffer's data.
+
+// function_returns_footer: frameinfo:read_data
+// function_footer: frameinfo_read_data_file__length_
+
+[#lua_class_attrib_frameinfo_comment]
+===== frameinfo.comment
+
+Mode: Retrieve or assign.
+
+Table of comments in this frame.
+
+// End frameinfo.comment
+
+[#lua_class_attrib_frameinfo_time]
+===== frameinfo.time
+
+Mode: Retrieve or assign.
+
+The packet timestamp as an NSTime object.
+
+Note: Set the `FileHandler.time_precision` to the appropriate `wtap_file_tsprec` value as well.
+
+// End frameinfo.time
+
+[#lua_class_attrib_frameinfo_data]
+===== frameinfo.data
+
+Mode: Retrieve or assign.
+
+The data buffer containing the packet.
+
+[NOTE]
+====
+This cannot be cleared once set.
+====
+
+// End frameinfo.data
+
+[#lua_class_attrib_frameinfo_rec_type]
+===== frameinfo.rec_type
+
+Mode: Retrieve or assign.
+
+The record type of the packet frame
+
+See `wtap_rec_types` for values.
+
+// End frameinfo.rec_type
+
+[#lua_class_attrib_frameinfo_flags]
+===== frameinfo.flags
+
+Mode: Retrieve or assign.
+
+The presence flags of the packet frame.
+
+See `wtap_presence_flags` for bit values.
+
+// End frameinfo.flags
+
+[#lua_class_attrib_frameinfo_captured_length]
+===== frameinfo.captured_length
+
+Mode: Retrieve or assign.
+
+The captured packet length,
+and thus the length of the buffer passed to the `FrameInfo.data` field.
+
+// End frameinfo.captured_length
+
+[#lua_class_attrib_frameinfo_original_length]
+===== frameinfo.original_length
+
+Mode: Retrieve or assign.
+
+The on-the-wire packet length,
+which may be longer than the `captured_length`.
+
+// End frameinfo.original_length
+
+[#lua_class_attrib_frameinfo_encap]
+===== frameinfo.encap
+
+Mode: Retrieve or assign.
+
+The packet encapsulation type for the frame/packet,
+if the file supports per-packet types. See `wtap_encaps` for possible
+packet encapsulation types to use as the value for this field.
+
+// End frameinfo.encap
+
+// class_footer: FrameInfo
+
+// wslua_frame_info.c
+[#lua_class_FrameInfoConst]
+==== FrameInfoConst
+
+A constant FrameInfo object, passed into Lua as an argument by the FileHandler write
+callback function.  This has similar attributes/properties as FrameInfo, but the fields can
+only be read from, not written to.
+
+// wslua_frame_info.c
+[#lua_fn_frameinfoconst___tostring__]
+===== frameinfoconst:__tostring()
+
+Generates a string of debug info for the FrameInfo
+
+[float]
+===== Returns
+
+String of debug information.
+
+// function_returns_footer: frameinfoconst:__tostring
+// function_footer: frameinfoconst___tostring__
+
+// wslua_frame_info.c
+[#lua_fn_frameinfoconst_write_data_file___length__]
+===== frameinfoconst:write_data(file, [length])
+
+Tells Wireshark to write directly to given file from the frame data buffer, for length bytes. Returns true if succeeded, else false.
+
+[float]
+===== Arguments
+
+file::
+
+The File object userdata, provided by Wireshark previously in a writing-based callback.
+
+// function_arg_footer: file
+length (optional)::
+
+The number of bytes to write to the file at the current cursor position, or all if not supplied.
+
+// function_arg_footer: length (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+True if succeeded, else returns false along with the error number and string error description.
+
+// function_returns_footer: frameinfoconst:write_data
+// function_footer: frameinfoconst_write_data_file___length__
+
+[#lua_class_attrib_frameinfoconst_comment]
+===== frameinfoconst.comment
+
+Mode: Retrieve only.
+
+The first string comment for the packet, if any;
+nil if there is no comment.
+
+// End frameinfoconst.comment
+
+[#lua_class_attrib_frameinfoconst_time]
+===== frameinfoconst.time
+
+Mode: Retrieve only.
+
+The packet timestamp as an NSTime object.
+
+// End frameinfoconst.time
+
+[#lua_class_attrib_frameinfoconst_data]
+===== frameinfoconst.data
+
+Mode: Retrieve only.
+
+The data buffer containing the packet.
+
+// End frameinfoconst.data
+
+[#lua_class_attrib_frameinfoconst_rec_type]
+===== frameinfoconst.rec_type
+
+Mode: Retrieve only.
+
+The record type of the packet frame - see `wtap_presence_flags` for values.
+
+// End frameinfoconst.rec_type
+
+[#lua_class_attrib_frameinfoconst_flags]
+===== frameinfoconst.flags
+
+Mode: Retrieve only.
+
+The presence flags of the packet frame - see `wtap_presence_flags` for bits.
+
+// End frameinfoconst.flags
+
+[#lua_class_attrib_frameinfoconst_captured_length]
+===== frameinfoconst.captured_length
+
+Mode: Retrieve only.
+
+The captured packet length, and thus the length of the buffer in the FrameInfoConst.data field.
+
+// End frameinfoconst.captured_length
+
+[#lua_class_attrib_frameinfoconst_original_length]
+===== frameinfoconst.original_length
+
+Mode: Retrieve only.
+
+The on-the-wire packet length, which may be longer than the `captured_length`.
+
+// End frameinfoconst.original_length
+
+[#lua_class_attrib_frameinfoconst_encap]
+===== frameinfoconst.encap
+
+Mode: Retrieve only.
+
+The packet encapsulation type, if the file supports per-packet types.
+
+See `wtap_encaps` for possible packet encapsulation types to use as the value for this field.
+
+// End frameinfoconst.encap
+
+// class_footer: FrameInfoConst
+[#global_functions_File]
+==== Global Functions
+
+// wslua_file_handler.c
+[#lua_fn_register_filehandler_filehandler_]
+===== register_filehandler(filehandler)
+
+Register the FileHandler into Wireshark/TShark, so they can read/write this new format.
+All functions and settings must be complete before calling this registration function.
+This function cannot be called inside the reading/writing callback functions.
+
+[float]
+===== Arguments
+
+filehandler::
+
+The FileHandler object to be registered
+
+// function_arg_footer: filehandler
+// end of function_args
+
+[float]
+===== Returns
+
+the new type number for this file reader/write
+
+// function_returns_footer: register_filehandler
+// function_footer: register_filehandler_filehandler_
+
+// wslua_file_handler.c
+[#lua_fn_deregister_filehandler_filehandler_]
+===== deregister_filehandler(filehandler)
+
+Deregister the FileHandler from Wireshark/TShark, so it no longer gets used for reading/writing/display.
+This function cannot be called inside the reading/writing callback functions.
+
+[float]
+===== Arguments
+
+filehandler::
+
+The FileHandler object to be deregistered
+
+// function_arg_footer: filehandler
+// end of function_args
+
+// function_footer: deregister_filehandler_filehandler_
+// Global function
+// end of module

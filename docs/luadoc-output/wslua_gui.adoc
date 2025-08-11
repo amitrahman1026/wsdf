@@ -1,0 +1,932 @@
+// wslua_gui.c
+[#lua_module_Gui]
+=== GUI Support
+
+// wslua_gui.c
+[#lua_class_ProgDlg]
+==== ProgDlg
+
+Creates and manages a modal progress bar.
+This is intended to be used with
+http://lua-users.org/wiki/CoroutinesTutorial[coroutines],
+where a main UI thread controls the progress bar dialog while a background coroutine (worker thread) yields to the main thread between steps.
+The main thread checks the status of the btn:[Cancel] button and if it's not set, returns control to the coroutine.
+
+.A progress bar in action
+image::images/wslua-progdlg.png[{medium-screenshot-attrs}]
+
+The legacy (GTK+) user interface displayed this as a separate dialog, hence the “Dlg” suffix.
+The Qt user interface shows a progress bar inside the main status bar.
+
+// wslua_gui.c
+[#lua_fn_ProgDlg_new__title____task__]
+===== ProgDlg.new([title], [task])
+
+Creates and displays a new `ProgDlg` progress bar with a btn:[Cancel] button and optional title.
+It is highly recommended that you wrap code that uses a `ProgDlg` instance because it does not automatically close itself upon encountering an error.
+Requires a GUI.
+
+===== Example
+
+[source,lua]
+----
+    if not gui_enabled() then return end
+
+    local p = ProgDlg.new("Constructing", "tacos")
+
+    -- We have to wrap the ProgDlg code in a pcall in case some unexpected
+    -- error occurs.
+    local ok, errmsg = pcall(function()
+            local co = coroutine.create(
+                    function()
+                            local limit = 100000
+                            for i=1,limit do
+                                    print("co", i)
+                                    coroutine.yield(i/limit, "step "..i.." of "..limit)
+                            end
+                    end
+            )
+
+            -- Whenever coroutine yields, check the status of the cancel button to determine
+            -- when to break. Wait up to 20 sec for coroutine to finish.
+            local start_time = os.time()
+            while coroutine.status(co) ~= 'dead' do
+                    local elapsed = os.time() - start_time
+
+                    -- Quit if cancel button pressed or 20 seconds elapsed
+                    if p:stopped() or elapsed > 20 then
+                            break
+                    end
+
+                    local res, val, val2 = coroutine.resume(co)
+                    if not res or res == false then
+                            if val then
+                                    debug(val)
+                            end
+                            print('coroutine error')
+                            break
+                    end
+
+                    -- show progress in progress dialog
+                    p:update(val, val2)
+            end
+    end)
+
+    p:close()
+
+    if not ok and errmsg then
+            report_failure(errmsg)
+    end
+----
+
+[float]
+===== Arguments
+
+title (optional)::
+
+Title of the progress bar. Defaults to "Progress".
+
+// function_arg_footer: title (optional)
+task (optional)::
+
+Optional task name, which will be appended to the title. Defaults to the empty string ("").
+
+// function_arg_footer: task (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The newly created `ProgDlg` object.
+
+// function_returns_footer: ProgDlg.new
+// function_footer: ProgDlg_new__title____task__
+
+// wslua_gui.c
+[#lua_fn_progdlg_update_progress___task__]
+===== progdlg:update(progress, [task])
+
+Sets the progress dialog's progress bar position based on percentage done.
+
+[float]
+===== Arguments
+
+progress::
+
+Progress value, e.g. 0.75. Value must be between 0.0 and 1.0 inclusive.
+
+// function_arg_footer: progress
+task (optional)::
+
+Task name. Currently ignored. Defaults to empty string ("").
+
+// function_arg_footer: task (optional)
+// end of function_args
+
+[float]
+===== Errors
+
+* GUI not available
+
+* Cannot be called for something not a ProgDlg
+
+* Progress value out of range (must be between 0.0 and 1.0)
+
+// function_errors_footer: progdlg:update
+// function_footer: progdlg_update_progress___task__
+
+// wslua_gui.c
+[#lua_fn_progdlg_stopped__]
+===== progdlg:stopped()
+
+Checks whether the user has pressed the btn:[Cancel] button.
+
+[float]
+===== Returns
+
+Boolean `true` if the user has asked to stop the operation, `false` otherwise.
+
+// function_returns_footer: progdlg:stopped
+// function_footer: progdlg_stopped__
+
+// wslua_gui.c
+[#lua_fn_progdlg_close__]
+===== progdlg:close()
+
+Hides the progress bar.
+
+[float]
+===== Returns
+
+A string specifying whether the Progress Dialog has stopped or not.
+
+// function_returns_footer: progdlg:close
+[float]
+===== Errors
+
+* GUI not available
+
+// function_errors_footer: progdlg:close
+// function_footer: progdlg_close__
+
+// class_footer: ProgDlg
+
+// wslua_gui.c
+[#lua_class_TextWindow]
+==== TextWindow
+
+Creates and manages a text window.
+The text can be read-only or editable, and buttons can be added below the text.
+
+.A text window in action
+image::images/wslua-textwindow.png[{medium-screenshot-attrs}]
+
+// wslua_gui.c
+[#lua_fn_TextWindow_new__title__]
+===== TextWindow.new([title])
+
+Creates a new `TextWindow` text window and displays it.
+Requires a GUI.
+
+===== Example
+
+[source,lua]
+----
+    if not gui_enabled() then return end
+
+    -- create new text window and initialize its text
+    local win = TextWindow.new("Log")
+    win:set("Hello world!")
+
+    -- add buttons to clear text window and to enable editing
+    win:add_button("Clear", function() win:clear() end)
+    win:add_button("Enable edit", function() win:set_editable(true) end)
+
+    -- add button to change text to uppercase
+    win:add_button("Uppercase", function()
+            local text = win:get_text()
+            if text ~= "" then
+                    win:set(string.upper(text))
+            end
+    end)
+
+    -- print "closing" to stdout when the user closes the text window
+    win:set_atclose(function() print("closing") end)
+----
+
+[float]
+===== Arguments
+
+title (optional)::
+
+Title of the new window. Optional. Defaults to "Untitled Window".
+
+// function_arg_footer: title (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The newly created `TextWindow` object.
+
+// function_returns_footer: TextWindow.new
+[float]
+===== Errors
+
+* GUI not available
+
+// function_errors_footer: TextWindow.new
+// function_footer: TextWindow_new__title__
+
+// wslua_gui.c
+[#lua_fn_textwindow_set_atclose_action_]
+===== textwindow:set_atclose(action)
+
+Set the function that will be called when the text window closes.
+
+[float]
+===== Arguments
+
+action::
+
+A Lua function to be executed when the user closes the text window.
+
+// function_arg_footer: action
+// end of function_args
+
+[float]
+===== Returns
+
+The `TextWindow` object.
+
+// function_returns_footer: textwindow:set_atclose
+[float]
+===== Errors
+
+* GUI not available
+
+// function_errors_footer: textwindow:set_atclose
+// function_footer: textwindow_set_atclose_action_
+
+// wslua_gui.c
+[#lua_fn_textwindow_set_text_]
+===== textwindow:set(text)
+
+Sets the text to be displayed.
+
+[float]
+===== Arguments
+
+text::
+
+The text to be displayed.
+
+// function_arg_footer: text
+// end of function_args
+
+[float]
+===== Returns
+
+The `TextWindow` object.
+
+// function_returns_footer: textwindow:set
+[float]
+===== Errors
+
+* GUI not available
+
+// function_errors_footer: textwindow:set
+// function_footer: textwindow_set_text_
+
+// wslua_gui.c
+[#lua_fn_textwindow_append_text_]
+===== textwindow:append(text)
+
+Appends text to the current window contents.
+
+[float]
+===== Arguments
+
+text::
+
+The text to be appended.
+
+// function_arg_footer: text
+// end of function_args
+
+[float]
+===== Returns
+
+The `TextWindow` object.
+
+// function_returns_footer: textwindow:append
+[float]
+===== Errors
+
+* GUI not available
+
+// function_errors_footer: textwindow:append
+// function_footer: textwindow_append_text_
+
+// wslua_gui.c
+[#lua_fn_textwindow_prepend_text_]
+===== textwindow:prepend(text)
+
+Prepends text to the current window contents.
+
+[float]
+===== Arguments
+
+text::
+
+The text to be prepended.
+
+// function_arg_footer: text
+// end of function_args
+
+[float]
+===== Returns
+
+The `TextWindow` object.
+
+// function_returns_footer: textwindow:prepend
+[float]
+===== Errors
+
+* GUI not available
+
+// function_errors_footer: textwindow:prepend
+// function_footer: textwindow_prepend_text_
+
+// wslua_gui.c
+[#lua_fn_textwindow_clear__]
+===== textwindow:clear()
+
+Erases all of the text in the window.
+
+[float]
+===== Returns
+
+The `TextWindow` object.
+
+// function_returns_footer: textwindow:clear
+[float]
+===== Errors
+
+* GUI not available
+
+// function_errors_footer: textwindow:clear
+// function_footer: textwindow_clear__
+
+// wslua_gui.c
+[#lua_fn_textwindow_get_text__]
+===== textwindow:get_text()
+
+Get the text of the window.
+
+[float]
+===== Returns
+
+The `TextWindow`++'++s text.
+
+// function_returns_footer: textwindow:get_text
+[float]
+===== Errors
+
+* GUI not available
+
+// function_errors_footer: textwindow:get_text
+// function_footer: textwindow_get_text__
+
+// wslua_gui.c
+[#lua_fn_textwindow_close__]
+===== textwindow:close()
+
+Close the window.
+
+[float]
+===== Errors
+
+* GUI not available
+
+// function_errors_footer: textwindow:close
+// function_footer: textwindow_close__
+
+// wslua_gui.c
+[#lua_fn_textwindow_set_editable__editable__]
+===== textwindow:set_editable([editable])
+
+Make this text window editable.
+
+[float]
+===== Arguments
+
+editable (optional)::
+
+`true` to make the text editable, `false` otherwise. Defaults to `true`.
+
+// function_arg_footer: editable (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The `TextWindow` object.
+
+// function_returns_footer: textwindow:set_editable
+[float]
+===== Errors
+
+* GUI not available
+
+// function_errors_footer: textwindow:set_editable
+// function_footer: textwindow_set_editable__editable__
+
+// wslua_gui.c
+[#lua_fn_textwindow_add_button_label__function_]
+===== textwindow:add_button(label, function)
+
+Adds a button with an action handler to the text window.
+
+[float]
+===== Arguments
+
+label::
+
+The button label.
+
+// function_arg_footer: label
+function::
+
+The Lua function to be called when the button is pressed.
+
+// function_arg_footer: function
+// end of function_args
+
+[float]
+===== Returns
+
+The `TextWindow` object.
+
+// function_returns_footer: textwindow:add_button
+[float]
+===== Errors
+
+* GUI not available
+
+// function_errors_footer: textwindow:add_button
+// function_footer: textwindow_add_button_label__function_
+
+// class_footer: TextWindow
+[#global_functions_Gui]
+==== Global Functions
+
+// wslua_gui.c
+[#lua_fn_gui_enabled__]
+===== gui_enabled()
+
+Checks if we're running inside a GUI (i.e. Wireshark) or not.
+
+[float]
+===== Returns
+
+Boolean `true` if a GUI is available, `false` if it isn't.
+
+// function_returns_footer: gui_enabled
+// function_footer: gui_enabled__
+
+// wslua_gui.c
+[#lua_fn_register_menu_name__action___group__]
+===== register_menu(name, action, [group])
+
+Register a menu item in one of the main menus. Requires a GUI.
+
+[float]
+===== Arguments
+
+name::
+
+The name of the menu item. Use slashes to separate submenus. (e.g. menu:Lua Scripts[My Fancy Statistics]). (string)
+
+// function_arg_footer: name
+action::
+
+The function to be called when the menu item is invoked. The function must take no arguments and return nothing.
+
+// function_arg_footer: action
+group (optional)::
+
+Where to place the item in the menu hierarchy.
+If omitted, defaults to MENU_STAT_GENERIC.
+Valid packet (Wireshark) items are:
+
+* MENU_PACKET_ANALYZE_UNSORTED: menu:Analyze[]
+* MENU_PACKET_STAT_UNSORTED: menu:Statistics[]
+* MENU_STAT_GENERIC: menu:Statistics[], first section
+* MENU_STAT_RESPONSE_TIME: menu:Statistics[Service Response Time]
+* MENU_STAT_RSERPOOL: menu:Statistics[Reliable Server Pooling (RSerPool)]
+* MENU_TELEPHONY_UNSORTED: menu:Telephony[]
+* MENU_TELEPHONY_ANSI: menu:Telephony[ANSI]
+* MENU_TELEPHONY_GSM: menu:Telephony[GSM]
+* MENU_TELEPHONY_3GPP_UU: menu:Telephony[3GPP Uu]
+* MENU_TELEPHONY_MTP3: menu:Telephony[MTP3]
+* MENU_TELEPHONY_SCTP: menu:Telephony[SCTP]
+* MENU_TOOLS_UNSORTED: menu:Tools[]
+
+Valid log (Logray) items are:
+
+* MENU_LOG_ANALYZE_UNSORTED: menu:Analyze[]
+* MENU_LOG_STAT_UNSORTED: menu:Statistics[]
+
+The following are deprecated and shouldn't be used in new code:
+
+* MENU_ANALYZE_CONVERSATION_FILTER, menu:Analyze[Conversation Filter] registration is not yet supported in Lua
+* MENU_STAT_CONVERSATION_LIST, menu:Statistics[Conversations] registration is not yet supported in Lua
+* MENU_STAT_ENDPOINT_LIST, menu:Statistics[Endpoints] registration is not yet supported in Lua
+* MENU_ANALYZE_UNSORTED, superseded by MENU_PACKET_ANALYZE_UNSORTED
+* MENU_ANALYZE_CONVERSATION, superseded by MENU_ANALYZE_CONVERSATION_FILTER
+* MENU_STAT_CONVERSATION, superseded by MENU_STAT_CONVERSATION_LIST
+* MENU_STAT_ENDPOINT, superseded by MENU_STAT_ENDPOINT_LIST
+* MENU_STAT_RESPONSE, superseded by MENU_STAT_RESPONSE_TIME
+* MENU_STAT_UNSORTED, superseded by MENU_PACKET_STAT_UNSORTED
+* MENU_STAT_TELEPHONY, superseded by MENU_TELEPHONY_UNSORTED
+* MENU_STAT_TELEPHONY_ANSI, superseded by MENU_TELEPHONY_ANSI
+* MENU_STAT_TELEPHONY_GSM, superseded by MENU_TELEPHONY_GSM
+* MENU_STAT_TELEPHONY_3GPP_UU, superseded by MENU_TELEPHONY_3GPP_UU
+* MENU_STAT_TELEPHONY_MTP3, superseded by MENU_TELEPHONY_MTP3
+* MENU_STAT_TELEPHONY_SCTP, superseded by MENU_TELEPHONY_SCTP
+
+// function_arg_footer: group (optional)
+// end of function_args
+
+// function_footer: register_menu_name__action___group__
+
+// wslua_gui.c
+[#lua_fn_register_packet_menu_name__action___required_fields__]
+===== register_packet_menu(name, action, [required_fields])
+
+Register a menu item in the packet list.
+
+[float]
+===== Arguments
+
+name::
+
+The name of the menu item. Use slashes to separate submenus. (e.g. level1/level2/name). (string)
+
+// function_arg_footer: name
+action::
+
+The function to be called when the menu item is invoked. The function must take a variable number of arguments and return nothing. The arguments will be FieldInfo objects, one for each field present in the selected packet.
+
+// function_arg_footer: action
+required_fields (optional)::
+
+A comma-separated list of packet fields (e.g., http.host,dns.qry.name) which all must be present for the menu to be displayed. If omitted, the packet menu will be displayed for all packets.
+
+// function_arg_footer: required_fields (optional)
+// end of function_args
+
+// function_footer: register_packet_menu_name__action___required_fields__
+
+// wslua_gui.c
+[#lua_fn_new_dialog_title__action______]
+===== new_dialog(title, action, ...)
+
+Displays a dialog, prompting for input. The dialog includes an btn:[OK] button and btn:[Cancel] button. Requires a GUI.
+
+.An input dialog in action
+image::images/wslua-new-dialog.png[{small-screenshot-attrs}]
+
+===== Example
+
+[source,lua]
+----
+    if not gui_enabled() then return end
+
+    -- Prompt for IP and port and then print them to stdout
+    local label_ip = "IP address"
+    local label_port = "Port"
+    local function print_ip(ip, port)
+            print(label_ip, ip)
+            print(label_port, port)
+    end
+    new_dialog("Enter IP address", print_ip, label_ip, label_port)
+
+    -- Prompt for 4 numbers and then print their product to stdout
+    new_dialog(
+            "Enter 4 numbers",
+            function (a, b, c, d) print(a * b * c * d) end,
+            "a", "b", "c", "d"
+            )
+----
+
+[float]
+===== Arguments
+
+title::
+
+The title of the dialog.
+
+// function_arg_footer: title
+action::
+
+Action to be performed when the user presses btn:[OK].
+
+// function_arg_footer: action
+...::
+
+Strings to be used as labels of the dialog's fields. Each string creates a new labeled field. The first field is required.
+Instead of a string it is possible to provide tables with fields 'name' and 'value' of type string. Then the created dialog's field will be labeled with the content of name and prefilled with the content of value.
+
+// function_arg_footer: ...
+// end of function_args
+
+[float]
+===== Errors
+
+* GUI not available
+
+* At least one field required
+
+// function_errors_footer: new_dialog
+// function_footer: new_dialog_title__action______
+
+// wslua_gui.c
+[#lua_fn_retap_packets__]
+===== retap_packets()
+
+Rescans all packets and runs each <<lua_class_Listener, tap listener>> without reconstructing the display.
+
+// function_footer: retap_packets__
+
+// wslua_gui.c
+[#lua_fn_copy_to_clipboard_text_]
+===== copy_to_clipboard(text)
+
+Copy a string into the clipboard. Requires a GUI.
+
+[float]
+===== Arguments
+
+text::
+
+The string to be copied into the clipboard.
+
+// function_arg_footer: text
+// end of function_args
+
+// function_footer: copy_to_clipboard_text_
+
+// wslua_gui.c
+[#lua_fn_open_capture_file_filename__filter_]
+===== open_capture_file(filename, filter)
+
+Open and display a capture file. Requires a GUI.
+
+[float]
+===== Arguments
+
+filename::
+
+The name of the file to be opened.
+
+// function_arg_footer: filename
+filter::
+
+The https://gitlab.com/wireshark/wireshark/-/wikis/DisplayFilters[display filter] to be applied once the file is opened.
+
+// function_arg_footer: filter
+// end of function_args
+
+// function_footer: open_capture_file_filename__filter_
+
+// wslua_gui.c
+[#lua_fn_get_filter__]
+===== get_filter()
+
+Get the main filter text.
+
+// function_footer: get_filter__
+
+// wslua_gui.c
+[#lua_fn_set_filter_text_]
+===== set_filter(text)
+
+Set the main filter text.
+
+[float]
+===== Arguments
+
+text::
+
+The filter's text.
+
+// function_arg_footer: text
+// end of function_args
+
+// function_footer: set_filter_text_
+
+// wslua_gui.c
+[#lua_fn_get_color_filter_slot_row_]
+===== get_color_filter_slot(row)
+
+Gets the current https://gitlab.com/wireshark/wireshark/-/wikis/ColoringRules[packet coloring rule] (by index) for the
+current session. Wireshark reserves 10 slots for these coloring rules. Requires a GUI.
+
+[float]
+===== Arguments
+
+row::
+
+The index (1-10) of the desired color filter value in the temporary coloring rules list.
+
+.Default background colors
+[cols="3",options="header"]
+|===
+|Index |RGB (hex) |Color
+|1  |ffc0c0 |{set:cellbgcolor:#ffc0c0} pink 1
+|2  |ffc0ff |{set:cellbgcolor:#ffc0ff} pink 2
+|3  |e0c0e0 |{set:cellbgcolor:#e0c0e0} purple 1
+|4  |c0c0ff |{set:cellbgcolor:#c0c0ff} purple 2
+|5  |c0e0e0 |{set:cellbgcolor:#c0e0e0} green 1
+|6  |c0ffff |{set:cellbgcolor:#c0ffff} green 2
+|7  |c0ffc0 |{set:cellbgcolor:#c0ffc0} green 3
+|8  |ffffc0 |{set:cellbgcolor:#ffffc0} yellow 1
+|9  |e0e0c0 |{set:cellbgcolor:#e0e0c0} yellow 2
+|10 |e0e0e0 |{set:cellbgcolor:#e0e0e0} gray
+|===
+
+// function_arg_footer: row
+// end of function_args
+
+// function_footer: get_color_filter_slot_row_
+
+// wslua_gui.c
+[#lua_fn_set_color_filter_slot_row__text_]
+===== set_color_filter_slot(row, text)
+
+Sets a https://gitlab.com/wireshark/wireshark/-/wikis/ColoringRules[packet coloring rule] (by index) for the current session.
+Wireshark reserves 10 slots for these coloring rules.
+Requires a GUI.
+
+[float]
+===== Arguments
+
+row::
+
+The index (1-10) of the desired color in the temporary coloring rules list.
+The default foreground is black and the default backgrounds are listed below.
+
+// XXX We need get the colors working, e.g. by adding them to a stylesheet.
+.Default background colors
+[cols="3",options="header"]
+|===
+|Index |RGB (hex) |Color
+|1  |ffc0c0 |{set:cellbgcolor:#ffc0c0} pink 1
+|2  |ffc0ff |{set:cellbgcolor:#ffc0ff} pink 2
+|3  |e0c0e0 |{set:cellbgcolor:#e0c0e0} purple 1
+|4  |c0c0ff |{set:cellbgcolor:#c0c0ff} purple 2
+|5  |c0e0e0 |{set:cellbgcolor:#c0e0e0} green 1
+|6  |c0ffff |{set:cellbgcolor:#c0ffff} green 2
+|7  |c0ffc0 |{set:cellbgcolor:#c0ffc0} green 3
+|8  |ffffc0 |{set:cellbgcolor:#ffffc0} yellow 1
+|9  |e0e0c0 |{set:cellbgcolor:#e0e0c0} yellow 2
+|10 |e0e0e0 |{set:cellbgcolor:#e0e0e0} gray
+|===
+
+The color list can be set from the command line using two unofficial preferences: `gui.colorized_frame.bg` and `gui.colorized_frame.fg`, which require 10 hex RGB codes (6 hex digits each), e.g.
+----
+wireshark -o gui.colorized_frame.bg:${RGB0},${RGB1},${RGB2},${RGB3},${RGB4},${RGB5},${RGB6},${RGB7},${RGB8},${RGB9}
+----
+
+For example, this command yields the same results as the table above (and with all foregrounds set to black):
+----
+wireshark -o gui.colorized_frame.bg:ffc0c0,ffc0ff,e0c0e0,c0c0ff,c0e0e0,c0ffff,c0ffc0,ffffc0,e0e0c0,e0e0e0 -o gui.colorized_frame.fg:000000,000000,000000,000000,000000,000000,000000,000000,000000,000000
+----
+
+// function_arg_footer: row
+text::
+
+The https://gitlab.com/wireshark/wireshark/-/wikis/DisplayFilters[display filter] for selecting packets to be colorized
+.
+
+// function_arg_footer: text
+// end of function_args
+
+// function_footer: set_color_filter_slot_row__text_
+
+// wslua_gui.c
+[#lua_fn_apply_filter__]
+===== apply_filter()
+
+Apply the filter in the main filter box.
+Requires a GUI.
+
+[WARNING]
+====
+Avoid calling this from within a dissector function or else an infinite loop can occur if it causes the dissector to be called again.
+This function is best used in a button callback (from a dialog or text window) or menu callback.
+====
+
+// function_footer: apply_filter__
+
+// wslua_gui.c
+[#lua_fn_reload__]
+===== reload()
+
+Reload the current capture file.  Deprecated. Use reload_packets() instead.
+
+// function_footer: reload__
+
+// wslua_gui.c
+[#lua_fn_reload_packets__]
+===== reload_packets()
+
+Reload the current capture file.
+Requires a GUI.
+
+[WARNING]
+====
+Avoid calling this from within a dissector function or else an infinite loop can occur if it causes the dissector to be called again.
+This function is best used in a button callback (from a dialog or text window) or menu callback.
+====
+
+// function_footer: reload_packets__
+
+// wslua_gui.c
+[#lua_fn_redissect_packets__]
+===== redissect_packets()
+
+Redissect all packets in the current capture file.
+Requires a GUI.
+
+[WARNING]
+====
+Avoid calling this from within a dissector function or else an infinite loop can occur if it causes the dissector to be called again.
+This function is best used in a button callback (from a dialog or text window) or menu callback.
+====
+
+// function_footer: redissect_packets__
+
+// wslua_gui.c
+[#lua_fn_reload_lua_plugins__]
+===== reload_lua_plugins()
+
+Reload all Lua plugins.
+
+// function_footer: reload_lua_plugins__
+
+// wslua_gui.c
+[#lua_fn_browser_open_url_url_]
+===== browser_open_url(url)
+
+Opens an URL in a web browser. Requires a GUI.
+
+[WARNING]
+====
+Do not pass an untrusted URL to this function.
+
+It will be passed to the system's URL handler, which might execute malicious code, switch on your Bluetooth-connected foghorn, or any of a number of unexpected or harmful things.
+====
+
+[float]
+===== Arguments
+
+url::
+
+The url.
+
+// function_arg_footer: url
+// end of function_args
+
+// function_footer: browser_open_url_url_
+
+// wslua_gui.c
+[#lua_fn_browser_open_data_file_filename_]
+===== browser_open_data_file(filename)
+
+Open a file located in the data directory (specified in the Wireshark preferences) in the web browser.
+If the file does not exist, the function silently ignores the request.
+Requires a GUI.
+
+[WARNING]
+====
+Do not pass an untrusted URL to this function.
+
+It will be passed to the system's URL handler, which might execute malicious code, switch on your Bluetooth-connected foghorn, or any of a number of unexpected or harmful things.
+====
+
+[float]
+===== Arguments
+
+filename::
+
+The file name.
+
+// function_arg_footer: filename
+// end of function_args
+
+// function_footer: browser_open_data_file_filename_
+// Global function
+// end of module

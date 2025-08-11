@@ -1,0 +1,271 @@
+// wslua_dir.c
+[#lua_module_Dir]
+=== Directory Handling Functions
+
+// wslua_dir.c
+[#lua_class_Dir]
+==== Dir
+
+A Directory object, as well as associated functions.
+
+// wslua_dir.c
+[#lua_fn_Dir_make_name_]
+===== Dir.make(name)
+
+Creates a directory.
+
+The created directory is set for permission mode 0755 (octal), meaning it is
+read+write+execute by owner, but only read+execute by group members and others.
+
+If the directory was created successfully, a boolean `true` is returned.
+If the directory cannot be made because it already exists, `false` is returned.
+If the directory cannot be made because an error occurred, `nil` is returned.
+
+[float]
+===== Arguments
+
+name::
+
+The name of the directory, possibly including path.
+
+// function_arg_footer: name
+// end of function_args
+
+[float]
+===== Returns
+
+Boolean `true` on success, `false` if the directory already exists, `nil` on error.
+
+// function_returns_footer: Dir.make
+// function_footer: Dir_make_name_
+
+// wslua_dir.c
+[#lua_fn_Dir_exists_name_]
+===== Dir.exists(name)
+
+Returns true if the given directory name exists.
+
+If the directory exists, a boolean `true` is returned.
+If the path is a file instead, `false` is returned.
+If the path does not exist or an error occurred, `nil` is returned.
+
+[float]
+===== Arguments
+
+name::
+
+The name of the directory, possibly including path.
+
+// function_arg_footer: name
+// end of function_args
+
+[float]
+===== Returns
+
+Boolean `true` if the directory exists, `false` if it's a file, `nil` on error or not-exist.
+
+// function_returns_footer: Dir.exists
+// function_footer: Dir_exists_name_
+
+// wslua_dir.c
+[#lua_fn_Dir_remove_name_]
+===== Dir.remove(name)
+
+Removes an empty directory.
+
+If the directory was removed successfully, a boolean `true` is returned.
+If the directory cannot be removed because it does not exist, `false` is returned.
+If the directory cannot be removed because an error occurred, `nil` is returned.
+
+This function only removes empty directories. To remove a directory regardless,
+use `Dir.remove_all()`.
+
+[float]
+===== Arguments
+
+name::
+
+The name of the directory, possibly including path.
+
+// function_arg_footer: name
+// end of function_args
+
+[float]
+===== Returns
+
+Boolean `true` on success, `false` if does not exist, `nil` on error.
+
+// function_returns_footer: Dir.remove
+// function_footer: Dir_remove_name_
+
+// wslua_dir.c
+[#lua_fn_Dir_remove_all_name_]
+===== Dir.remove_all(name)
+
+Removes an empty or non-empty directory.
+
+If the directory was removed successfully, a boolean `true` is returned.
+If the directory cannot be removed because it does not exist, `false` is returned.
+If the directory cannot be removed because an error occurred, `nil` is returned.
+
+[float]
+===== Arguments
+
+name::
+
+The name of the directory, possibly including path.
+
+// function_arg_footer: name
+// end of function_args
+
+[float]
+===== Returns
+
+Boolean `true` on success, `false` if does not exist, `nil` on error.
+
+// function_returns_footer: Dir.remove_all
+// function_footer: Dir_remove_all_name_
+
+// wslua_dir.c
+[#lua_fn_Dir_open_pathname___extension__]
+===== Dir.open(pathname, [extension])
+
+Opens a directory and returns a <<lua_class_Dir,`Dir`>> object representing the files in the directory.
+
+==== Example
+
+[source,lua]
+----
+    -- Print the contents of a directory
+    for filename in Dir.open('/path/to/dir') do
+            print(filename)
+    end
+----
+
+[float]
+===== Arguments
+
+pathname::
+
+The pathname of the directory.
+
+// function_arg_footer: pathname
+extension (optional)::
+
+If given, only files with this extension will be returned.
+
+// function_arg_footer: extension (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The <<lua_class_Dir,`Dir`>> object.
+
+// function_returns_footer: Dir.open
+// function_footer: Dir_open_pathname___extension__
+
+// wslua_dir.c
+[#lua_fn_Dir_personal_config_path__filename__]
+===== Dir.personal_config_path([filename])
+
+Gets the https://www.wireshark.org/docs/wsug_html_chunked/ChAppFilesConfigurationSection.html[personal configuration] directory path, with filename if supplied.
+
+[float]
+===== Arguments
+
+filename (optional)::
+
+A filename.
+
+// function_arg_footer: filename (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The full pathname for a file in the personal configuration directory.
+
+// function_returns_footer: Dir.personal_config_path
+// function_footer: Dir_personal_config_path__filename__
+
+// wslua_dir.c
+[#lua_fn_Dir_global_config_path__filename__]
+===== Dir.global_config_path([filename])
+
+Gets the https://www.wireshark.org/docs/wsug_html_chunked/ChAppFilesConfigurationSection.html[global configuration] directory path, with filename if supplied.
+
+[float]
+===== Arguments
+
+filename (optional)::
+
+A filename
+
+// function_arg_footer: filename (optional)
+// end of function_args
+
+[float]
+===== Returns
+
+The full pathname for a file in Wireshark's configuration directory.
+
+// function_returns_footer: Dir.global_config_path
+// function_footer: Dir_global_config_path__filename__
+
+// wslua_dir.c
+[#lua_fn_Dir_personal_plugins_path__]
+===== Dir.personal_plugins_path()
+
+Gets the personal plugins directory path.
+
+[float]
+===== Returns
+
+The pathname of the https://www.wireshark.org/docs/wsug_html_chunked/ChPluginFolders.html[personal plugins] directory.
+
+// function_returns_footer: Dir.personal_plugins_path
+// function_footer: Dir_personal_plugins_path__
+
+// wslua_dir.c
+[#lua_fn_Dir_global_plugins_path__]
+===== Dir.global_plugins_path()
+
+Gets the global plugins directory path.
+
+[float]
+===== Returns
+
+The pathname of the https://www.wireshark.org/docs/wsug_html_chunked/ChPluginFolders.html[global plugins] directory.
+
+// function_returns_footer: Dir.global_plugins_path
+// function_footer: Dir_global_plugins_path__
+
+// wslua_dir.c
+[#lua_fn_dir___call__]
+===== dir:__call()
+
+Gets the next file or subdirectory within the directory, or `nil` when done.
+
+==== Example
+
+[source,lua]
+----
+    -- Open a directory and print the name of the first file or subdirectory
+    local dir = Dir.open('/path/to/dir')
+    local first = dir()
+    print(tostring(file))
+----
+
+// function_footer: dir___call__
+
+// wslua_dir.c
+[#lua_fn_dir_close__]
+===== dir:close()
+
+Closes the directory. Called automatically during garbage collection of a <<lua_class_Dir,`Dir`>> object.
+
+// function_footer: dir_close__
+
+// class_footer: Dir
+// end of module
