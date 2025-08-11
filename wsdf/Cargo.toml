@@ -42,6 +42,6 @@ thiserror = "1.0"
 # name = "multi"
 # crate-type = ["cdylib"]
 # 
-# [[example]]
-# name = "builder"
-# crate-type = ["cdylib"]
+[[example]]
+name = "builder"
+crate-type = ["cdylib"]
