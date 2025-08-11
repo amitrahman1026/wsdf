@@ -1,16 +1,64 @@
-API Improvements
-    Tree API Enhancement: Implement RAII-style tree management to eliminate
+API Improvements - Lua API Parity Focus
+
+    The overarching goal is to provide a Lua-like API with Rust ergonomics and
+    native C performance. After benchmarking it may turn out that they
+    performance gain is minimal, however, it might be more important for
+    usability of this crate to at least reach parity with Lua API.
+
+    Generating Wireshark's Lua API documentation by running make-wsluarm.py, the
+    we are currently missing the following for implementation for decent-ish
+    parity:
+
+    -- 1. Core Missing Features --
+
+    Packet Info Enhancement: Add getters for packet metadata (timestamp,
+    addresses, ports, frame numbers, protocol context). Currently only supports
+    column setting and memory allocation.
+
+    Preferences System: Complete Pref class implementation with Pref.bool(),
+    Pref.uint(), Pref.enum(), Pref.range(), Pref.string() builders and runtime
+    preference access via proto.prefs table equivalent.
+
+    Field Builders Enhancement: Add convenience constructors matching Lua's
+    ProtoField class - FieldBuilder::ipv4(), ::timestamp(), ::string(),
+    ::guid() etc. for ergonomic field creation.
+
+    DissectorTable Runtime Access: Allow dynamic dissector table manipulation
+    with add(), remove(), try(), get_dissector() equivalent to Lua's DissectorTable
+    class methods.
+
+    -- 2. Advanced Protocol Features --
+
+    Heuristic Dissector Support: Implement proto:register_heuristic() equivalent
+    and DissectorTable.try_heuristics() for protocol auto-detection.
+
+    Field Access System: Add Field and FieldInfo classes for accessing fields
+    from other dissectors, enabling cross-protocol field references.
+
+    Enhanced String Encoding: Full charset support beyond current UTF8/ASCII
+    basic implementation to match Lua's encoding options.
+
+    Address Manipulation: Implement Address class with ip(), ipv6(), ether()
+    constructors and comparison operations for network address handling.
+
+    -- 3. Extended Functionality --
+
+    Int64/UInt64 Classes: Large integer manipulation with arithmetic, bitwise
+    operations, and conversions for protocols requiring 64-bit precision.
+
+    Listener/Tap System: Packet statistics and analysis framework with
+    Listener.new() equivalent and tap registration.
+
+    ByteArray Utilities: Data manipulation helpers for protocol processing
+    beyond current TvbRange byte extraction.
+
+    Tree API: Implement RAII-style tree management to eliminate
     end_subtree calls
-
-    Preferences System: Add configuration/preferences support like Lua API
-
-    Heuristic Dissectors: Implement heuristic dissector registration
 
 Developer Experience
     Build System: Improve platform detection and Wireshark version compatibility
 
     Installation Tools: Automated plugin installation and management
-
 
 Be aware of possible incoming changes to the plugin API
 
@@ -29,6 +77,10 @@ Create integration testing for wsdf generated plugins
     A good approach would be to hook onto the test suite of wireshark which uses
     tshark to run against sample pcap files for integration testing.
 
+    Testing should validate Lua API parity by comparing output from equivalent
+    Lua and Rust dissectors against the same packet data. We can possibly do
+    this using a tshark based flow.
+
 
 Improve cross platform building and pin releases to wireshark versions
 
@@ -36,13 +88,52 @@ Improve cross platform building and pin releases to wireshark versions
     issues. However it would be great to explore using cargo to handle this. 
 
     On top of that, there should be a better way to decouple and allow for
-    flexibility of the underlying wireshark system. Currently beyond the gitsubmodule
-    commit, there is not a more robust pinned version of wireshark.
+    flexibility of the underlying wireshark system. Currently beyond the git
+    submodule commit, there is not a more robust pinned version of wireshark.
 
     It may be worthwhile to explore extending the build.rs or cargo xtasks for 
     more rigid portability
 
     Windows remain untested.
+
+Code Generation Research and Future Automation
+
+    Wireshark's Lua API is largely auto-generated from C code using macro-based
+    annotation and Python scripts. Understanding this system could enable similar
+    automation for the Rust port:
+
+    Wireshark's Code Generation System:
+
+    Annotation Macros: C source uses WSLUA_CLASS_DEFINE, WSLUA_FUNCTION,
+    WSLUA_METHOD, WSLUA_CONSTRUCTOR macros to mark exportable functions.
+
+    Registration Generation: make-reg.py (epan/wslua/make-reg.py) scans C
+    files for these macros and generates register_wslua.c and declare_wslua.h
+    automatically.
+
+    Documentation Generation: make-wsluarm.py extracts Doxygen-style comments
+    from macro-annotated functions to generate AsciiDoc API documentation.
+
+    Build Integration: CMake integrates these scripts to regenerate binding
+    code when C sources change, maintaining API consistency.
+
+    Potential Rust Automation Approaches:
+
+    Macro-based Annotations: Develop Rust macros that annotate functions for
+    Lua-style API export, similar to Wireshark's WSLUA_* macros?
+
+    Use proc macros to generate boilerplate registration code, field builders,
+    and FFI bindings from high-level declarations.
+
+    Build Script Integration: Enhance build.rs to scan annotated Rust code
+    and auto-generate plugin registration, similar to make-reg.py workflow.
+
+    Documentation Extraction: Extract doc comments from annotated functions
+    to generate API documentation matching Wireshark's style.
+
+    Research Priority: Analyze feasibility of proc macro system that could
+    generate Protocol builders, field definitions, and registration code from
+    declarative syntax, reducing boilerplate while maintaining type safety.
 
 Add logs to generated code
 
