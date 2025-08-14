@@ -1,6 +1,6 @@
 use super::{protocol::*, types::*};
 use epan_sys;
-use std::ffi::c_int;
+use std::ffi::{c_char, c_int};
 
 /// A packet dissector implementation using the new TvbRange API.
 ///
@@ -346,11 +346,11 @@ impl PacketInfo {
         Self { ptr }
     }
     // This raw pointer is managed by the block allocator of wmem
-    pub unsafe fn alloc_string(&self, s: &str) -> *const i8 {
+    pub unsafe fn alloc_string(&self, s: &str) -> *const c_char {
         let c_str = std::ffi::CString::new(s).expect("msg");
         unsafe {
             let size = s.len() + 1; // +1 for null terminator
-            let ptr = epan_sys::wmem_alloc((*self.ptr).pool, size) as *mut i8;
+            let ptr = epan_sys::wmem_alloc((*self.ptr).pool, size) as *mut c_char;
             std::ptr::copy_nonoverlapping(c_str.as_ptr(), ptr, size);
             ptr
         }
