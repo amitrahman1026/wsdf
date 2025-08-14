@@ -2,35 +2,40 @@ use super::{protocol::*, types::*};
 use epan_sys;
 use std::ffi::c_int;
 
-/// A packet dissector implementation.
+/// A packet dissector implementation using the new TvbRange API.
 ///
 /// Dissectors contain the logic for analyzing packet contents and building
-/// the protocol tree.
+/// the protocol tree. The new API matches Wireshark's Lua patterns for familiarity.
 ///
 /// # Example
 ///
 /// ```rust
-/// let dissector = Dissector::new(|tree| {
-///     // Add version field
-///     let item = tree.add_item("version", 1, Encoding::BigEndian)?;
+/// let dissector = Dissector::new(|tree, tvb| {
+///     // Create ranges for data access. Analogous to Lua API tvb(offset, length)
+///     // Reference: wslua_tvb.c Tvb_range()
+///     let version_range = tvb.range(0, 1)?;
+///     let header_range = tvb.range(1, 8)?;
 ///
-///     // Add subtree
-///     let mut subtree = tree.add_subtree("header", "header_fields")?;
+///     // Add to tree using ranges. Analogous to Lua API tree:add(field, range)
+///     // Reference: wslua_tree.c TreeItem_add()
+///     tree.add_item("version", version_range)?;
+///     let mut header_tree = tree.add("header", header_range)?;
 ///
-///     // Process more fields...
+///     // Extract values from ranges. Analogous to Lua API range:uint()
+///     // Reference: wslua_tvb.c TvbRange_uint()
+///     let version = version_range.uint8()?;
 ///
-///     tree.end_subtree(&subtree);
-///     0
+///     Ok(tvb.reported_length()) // Return consumed bytes
 /// });
 /// ```
 pub struct Dissector {
-    inner: Box<dyn Fn(&mut Tree) -> i32>,
+    inner: Box<dyn Fn(&mut Tree, Tvb) -> Result<i32, Box<dyn std::error::Error>>>,
 }
 
 impl Dissector {
     pub fn new<F>(f: F) -> Self
     where
-        F: Fn(&mut Tree) -> i32 + 'static,
+        F: Fn(&mut Tree, Tvb) -> Result<i32, Box<dyn std::error::Error>> + 'static,
     {
         Dissector { inner: Box::new(f) }
     }
@@ -50,74 +55,123 @@ impl Dissector {
         if proto_tree.is_null() {
             return epan_sys::tvb_captured_length(tvb) as i32;
         }
-        let tree = Tree::new(protocol, pinfo, proto_tree, tvb, 0);
-        if let Ok(mut tree) = tree {
-            (self.inner)(&mut tree)
-        } else {
-            0
+
+        let tree_result = Tree::new(protocol, pinfo, proto_tree, tvb, 0);
+        match tree_result {
+            Ok((mut tree, tvb_wrapper)) => {
+                match (self.inner)(&mut tree, tvb_wrapper) {
+                    Ok(consumed) => consumed,
+                    Err(_) => 0, // Error in dissection
+                }
+            }
+            Err(_) => 0, // Error creating tree
         }
     }
 }
 
-// WIP: Data structures needed to support the object oriented API
+/// Immutable reference to packet data - matches C tvbuff_t*
+/// This represents a view into packet data without any dissector state
 #[derive(Clone, Copy)]
 pub struct Tvb {
     ptr: *mut epan_sys::tvbuff,
-    pub start: i32,
-    pub offset: i32,
 }
+
 impl Tvb {
     pub fn new(ptr: *mut epan_sys::tvbuff) -> Self {
-        Self {
-            ptr,
-            start: 0,
+        Self { ptr }
+    }
+
+    /// Get the total reported length of this TVB
+    pub fn reported_length(&self) -> i32 {
+        unsafe { epan_sys::tvb_reported_length(self.ptr) as i32 }
+    }
+
+    /// Get the captured length of this TVB
+    pub fn captured_length(&self) -> i32 {
+        unsafe { epan_sys::tvb_captured_length(self.ptr) as i32 }
+    }
+
+    /// Get remaining reported length from offset
+    pub fn reported_length_remaining(&self, offset: i32) -> i32 {
+        unsafe { epan_sys::tvb_reported_length_remaining(self.ptr, offset) }
+    }
+
+    /// Get remaining captured length from offset
+    pub fn captured_length_remaining(&self, offset: i32) -> i32 {
+        unsafe { epan_sys::tvb_captured_length_remaining(self.ptr, offset) }
+    }
+
+    /// Create a TvbRange from this TVB. Analogous to Lua API tvb(offset, length)
+    /// Reference: wslua_tvb.c Tvb_range()
+    pub fn range(&self, offset: i32, length: i32) -> Result<TvbRange, TvbError> {
+        if offset < 0 {
+            return Err(TvbError::InvalidRange);
+        }
+
+        let actual_length = if length == -1 {
+            self.reported_length_remaining(offset)
+        } else {
+            if length < 0 {
+                return Err(TvbError::InvalidRange);
+            }
+            length
+        };
+
+        if actual_length < 0 {
+            return Err(TvbError::OutOfBounds);
+        }
+
+        if offset + actual_length > self.reported_length() {
+            return Err(TvbError::OutOfBounds);
+        }
+
+        Ok(TvbRange {
+            tvb: *self,
+            offset,
+            length: actual_length,
+        })
+    }
+
+    /// Create a range covering the entire TVB
+    pub fn range_all(&self) -> TvbRange {
+        TvbRange {
+            tvb: *self,
             offset: 0,
+            length: self.reported_length(),
         }
     }
-    pub unsafe fn get_ptr(&self, offset: i32, length: i32) -> *const u8 {
-        epan_sys::tvb_get_ptr(self.ptr, offset, length)
-    }
 
-    // The get_DATA() type functions should do the book keeping required for the underlying managed buffer
-
-    pub fn get_uint8(&mut self, _offset: i32) -> Result<u8, DissectorError> {
-        if self.offset >= self.length() {
-            return Err(DissectorError::TvbError {
-                offset: self.offset,
-                kind: TvbErrorKind::OutOfBounds,
-            });
-        }
-
+    /// Create subset TVB with specified length
+    pub fn subset_length(&self, offset: i32, length: i32) -> Result<Tvb, TvbError> {
         unsafe {
-            let ret = epan_sys::tvb_get_uint8(self.ptr, self.offset);
-            self.offset += 1;
-            Ok(ret)
+            let tvb = epan_sys::tvb_new_subset_length(self.ptr, offset, length);
+            if tvb.is_null() {
+                Err(TvbError::SubsetFailed)
+            } else {
+                Ok(Tvb { ptr: tvb })
+            }
         }
     }
 
-    pub fn get_uint16(&mut self, _offset: i32, encoding: Encoding) -> Result<u16, DissectorError> {
-        if self.offset + 2 >= self.length() {
-            return Err(DissectorError::TvbError {
-                offset: self.offset,
-                kind: TvbErrorKind::OutOfBounds,
-            });
-        }
+    /// Create subset TVB from offset to end
+    pub fn subset_remaining(&self, offset: i32) -> Result<Tvb, TvbError> {
         unsafe {
-            let ret = match encoding {
-                Encoding::BigEndian => epan_sys::tvb_get_ntohs(self.ptr, self.offset),
-                // everything that is not Big Endian (enc as 0) is Litte endian in wireshark
-                _ => epan_sys::tvb_get_letohs(self.ptr, self.offset),
-            };
-            self.offset += 2;
-            Ok(ret)
+            let tvb = epan_sys::tvb_new_subset_remaining(self.ptr, offset);
+            if tvb.is_null() {
+                Err(TvbError::SubsetFailed)
+            } else {
+                Ok(Tvb { ptr: tvb })
+            }
         }
     }
+
+    /// Create child TVB with new data
     pub unsafe fn new_child_real_data(
         &self,
         data: *const u8,
         length: u32,
         reported_length: u32,
-    ) -> Option<Tvb> {
+    ) -> Result<Tvb, TvbError> {
         let tvb = epan_sys::tvb_new_child_real_data(
             self.ptr,
             data as *mut u8,
@@ -125,27 +179,164 @@ impl Tvb {
             reported_length as i32,
         );
 
-        if !tvb.is_null() {
-            Some(Tvb::new(tvb))
+        if tvb.is_null() {
+            Err(TvbError::SubsetFailed)
         } else {
-            None
+            Ok(Tvb { ptr: tvb })
         }
     }
-    pub unsafe fn new_subset_remaining(&self, offset: i32) -> Option<Tvb> {
-        let tvb = epan_sys::tvb_new_subset_remaining(self.ptr, offset);
-        if !tvb.is_null() {
-            Some(Tvb::new(tvb))
-        } else {
-            None
-        }
+
+    /// Get raw pointer to data (unsafe)
+    pub unsafe fn get_ptr(&self, offset: i32, length: i32) -> *const u8 {
+        epan_sys::tvb_get_ptr(self.ptr, offset, length)
     }
-    pub fn length(&self) -> i32 {
-        unsafe { epan_sys::tvb_reported_length(self.ptr) as i32 }
-    }
-    pub fn remaining_length(&self, offset: i32) -> i32 {
-        unsafe { epan_sys::tvb_captured_length_remaining(self.ptr, offset) }
+
+    /// Internal getter for the raw pointer
+    pub(crate) fn as_ptr(&self) -> *mut epan_sys::tvbuff {
+        self.ptr
     }
 }
+
+/// Lightweight view into a TVB. Analogous to Lua API TvbRange concept
+/// Reference: wslua_tvb.c TvbRange struct and methods
+/// This is where the actual data extraction happens
+#[derive(Clone, Copy)]
+pub struct TvbRange {
+    tvb: Tvb,
+    offset: i32,
+    length: i32,
+}
+
+impl TvbRange {
+    /// Get the underlying TVB
+    pub fn tvb(&self) -> Tvb {
+        self.tvb
+    }
+
+    /// Get the offset within the TVB
+    pub fn offset(&self) -> i32 {
+        self.offset
+    }
+
+    /// Get the length of this range
+    pub fn length(&self) -> i32 {
+        self.length
+    }
+
+    /// Create a sub-range within this range
+    pub fn range(&self, offset: i32, length: i32) -> Result<TvbRange, TvbError> {
+        if offset < 0 {
+            return Err(TvbError::InvalidRange);
+        }
+
+        let actual_length = if length == -1 {
+            self.length - offset
+        } else {
+            if length < 0 {
+                return Err(TvbError::InvalidRange);
+            }
+            length
+        };
+
+        if actual_length < 0 || offset + actual_length > self.length {
+            return Err(TvbError::OutOfBounds);
+        }
+
+        Ok(TvbRange {
+            tvb: self.tvb,
+            offset: self.offset + offset,
+            length: actual_length,
+        })
+    }
+
+    /// Extract uint8 from this range. Analogous to Lua API TvbRange:uint()
+    /// Reference: wslua_tvb.c TvbRange_uint()
+    pub fn uint8(&self) -> Result<u8, TvbError> {
+        if self.length < 1 {
+            return Err(TvbError::InvalidLength {
+                expected: 1,
+                actual: self.length,
+            });
+        }
+        unsafe { Ok(epan_sys::tvb_get_uint8(self.tvb.ptr, self.offset)) }
+    }
+
+    /// Extract uint16 with endianness
+    pub fn uint16(&self, encoding: Encoding) -> Result<u16, TvbError> {
+        if self.length < 2 {
+            return Err(TvbError::InvalidLength {
+                expected: 2,
+                actual: self.length,
+            });
+        }
+        unsafe {
+            let value = match encoding {
+                Encoding::BigEndian => epan_sys::tvb_get_ntohs(self.tvb.ptr, self.offset),
+                Encoding::LittleEndian => epan_sys::tvb_get_letohs(self.tvb.ptr, self.offset),
+                _ => return Err(TvbError::InvalidEncoding),
+            };
+            Ok(value)
+        }
+    }
+
+    /// Extract uint32 with endianness
+    pub fn uint32(&self, encoding: Encoding) -> Result<u32, TvbError> {
+        if self.length < 4 {
+            return Err(TvbError::InvalidLength {
+                expected: 4,
+                actual: self.length,
+            });
+        }
+        unsafe {
+            let value = match encoding {
+                Encoding::BigEndian => epan_sys::tvb_get_ntohl(self.tvb.ptr, self.offset),
+                Encoding::LittleEndian => epan_sys::tvb_get_letohl(self.tvb.ptr, self.offset),
+                _ => return Err(TvbError::InvalidEncoding),
+            };
+            Ok(value)
+        }
+    }
+
+    /// Get raw bytes as Vec. Analogous to Lua API TvbRange:bytes()
+    /// Reference: wslua_tvb.c TvbRange_bytes()
+    pub fn bytes(&self) -> Vec<u8> {
+        unsafe {
+            let ptr = epan_sys::tvb_get_ptr(self.tvb.ptr, self.offset, self.length);
+            std::slice::from_raw_parts(ptr, self.length as usize).to_vec()
+        }
+    }
+
+    /// Create subset TVB from this range. Analogous to Lua API TvbRange:tvb()
+    /// Reference: wslua_tvb.c TvbRange_tvb()
+    pub fn to_tvb(&self) -> Result<Tvb, TvbError> {
+        self.tvb.subset_length(self.offset, self.length)
+    }
+
+    /// Get string with encoding. Analogous to Lua API TvbRange:string()
+    /// Reference: wslua_tvb.c TvbRange_string()
+    pub fn string(&self, encoding: Encoding) -> Result<String, TvbError> {
+        let bytes = self.bytes();
+        match encoding {
+            Encoding::UTF8 => String::from_utf8(bytes).map_err(|_| TvbError::InvalidEncoding),
+            Encoding::ASCII7Bits => {
+                // Convert ASCII bytes to string
+                if bytes.iter().all(|&b| b <= 127) {
+                    Ok(String::from_utf8_lossy(&bytes).to_string())
+                } else {
+                    Err(TvbError::InvalidEncoding)
+                }
+            }
+            _ => Err(TvbError::InvalidEncoding), // TODO: Add more encoding support
+        }
+    }
+
+    /// Check if bytes exist without throwing. Analogous to Lua API bounds checking
+    /// Reference: wslua_tvb.c push_TvbRange() bounds validation
+    pub fn bytes_exist(&self) -> bool {
+        unsafe { epan_sys::tvb_bytes_exist(self.tvb.ptr, self.offset, self.length) }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct PacketInfo {
     ptr: *mut epan_sys::_packet_info,
@@ -185,27 +376,30 @@ impl PacketInfo {
     }
     pub unsafe fn add_data_source(&self, tvb: &Tvb, name: &str) {
         let name = self.alloc_string(name);
-        epan_sys::add_new_data_source(self.ptr, tvb.ptr, name);
+        epan_sys::add_new_data_source(self.ptr, tvb.as_ptr(), name);
     }
 }
 
+/// Tree represents a protocol tree node that can have children added to it.
+/// Analogous to Lua API TreeItem concept - it's both an item and potential container
+/// Reference: wslua_tree.c TreeItem struct and methods
 pub struct Tree<'a> {
     protocol: &'a Protocol,
     pub pinfo: PacketInfo,
-    pub tvb: Tvb,
-    current_node: *mut epan_sys::proto_node,
-    current_item: *mut epan_sys::proto_item,
+    current_node: *mut epan_sys::proto_node, // The subtree for adding children to
+    current_item: *mut epan_sys::proto_item, // The item itself
 }
 
 impl<'a> Tree<'a> {
-    // This should be called before top level dissector function, when the whole packet is first dissected
-    unsafe fn new(
+    /// Create the root tree for a protocol dissector
+    /// This should be called at the start of dissection
+    pub(crate) unsafe fn new(
         protocol: &'a Protocol,
         pinfo: *mut epan_sys::packet_info,
         parent: *mut epan_sys::proto_node,
         tvb: *mut epan_sys::tvbuff,
         offset: i32,
-    ) -> TreeResult<Self> {
+    ) -> TreeResult<(Self, Tvb)> {
         let item = epan_sys::proto_tree_add_item(
             parent,
             protocol.get_proto_handle(),
@@ -237,30 +431,38 @@ impl<'a> Tree<'a> {
             ));
         }
 
-        Ok(Self {
+        let tree = Self {
             protocol,
             pinfo: PacketInfo::new(pinfo),
-            tvb: Tvb::new(tvb),
             current_node: current,
             current_item: item,
-        })
+        };
+
+        let tvb_wrapper = Tvb::new(tvb);
+
+        Ok((tree, tvb_wrapper))
     }
-    pub fn get_reported_length(&self) -> i32 {
-        unsafe { epan_sys::tvb_reported_length(self.tvb.ptr) as i32 }
-    }
-    pub fn add_subtree(&mut self, field_id: &str, ett_id: &str) -> TreeResult<Tree<'a>> {
+    /// Add child item to tree using TvbRange. Analogous to Lua API tree:add(field, range)
+    /// Reference: wslua_tree.c TreeItem_add()
+    pub fn add(&mut self, field_id: &str, range: TvbRange) -> TreeResult<Tree<'a>> {
         let field_handle = self
             .protocol
             .get_field_handle(field_id)
             .ok_or_else(|| TreeError::AddItemFailed(format!("Field '{}' not found", field_id)))?;
 
+        if !range.bytes_exist() {
+            return Err(TreeError::AddItemFailed(
+                "TvbRange extends beyond packet data".into(),
+            ));
+        }
+
         unsafe {
             let item = epan_sys::proto_tree_add_item(
                 self.current_node,
                 field_handle.handle,
-                self.tvb.ptr,
-                self.tvb.offset, // New subtrees should be added at the current offset of the parent subtree's tvb
-                0,               // Length will be set when sub tree is ended
+                range.tvb.as_ptr(),
+                range.offset,
+                range.length,
                 epan_sys::ENC_NA,
             );
 
@@ -270,67 +472,52 @@ impl<'a> Tree<'a> {
                     field_id
                 )));
             }
+
+            // Get the field's ETT for creating subtree (or use a default)
             let ett_handle = self
                 .protocol
-                .get_ett_handle(ett_id)
-                .ok_or(TreeError::EttNotFound(format!(
-                    "Ett '{}' not found",
-                    ett_id
-                )))?;
+                .get_ett_handle(&format!("{}_ett", field_id))
+                .or_else(|| self.protocol.get_ett_handle(ROOT_ETT_ID))
+                .ok_or(TreeError::EttNotFound("No suitable ETT found".into()))?;
 
+            // Convert item to subtree (Lua pattern!)
             let subtree = epan_sys::proto_item_add_subtree(item, ett_handle);
-
-            if subtree.is_null() {
-                return Err(TreeError::InvalidSubtreeOperation(format!(
-                    "Failed to create subtree for field '{}'",
-                    field_id
-                )));
-            }
 
             Ok(Tree {
                 protocol: self.protocol,
                 pinfo: self.pinfo,
-                tvb: self.tvb,
                 current_node: subtree,
                 current_item: item,
             })
         }
     }
 
-    pub fn end_subtree(&mut self, subtree: &Tree) {
-        let length = subtree.tvb.offset - subtree.tvb.start;
-        unsafe {
-            epan_sys::proto_item_set_len(subtree.current_item, length);
-        }
-        self.tvb.offset = subtree.tvb.offset;
-    }
-
-    // Adds an item to the start offset of the tree, and increment the current offset by length
-    // Returns a TreeItem that offers a view on the "section" the item looks at
-    pub fn add_item(
+    /// Add child item with specific encoding. Analogous to Lua API tree:add(field, range, encoding)
+    /// Reference: wslua_tree.c TreeItem_add()
+    pub fn add_with_encoding(
         &mut self,
         field_id: &str,
-        length: i32,
+        range: TvbRange,
         encoding: Encoding,
-    ) -> TreeResult<TreeItem> {
+    ) -> TreeResult<Tree<'a>> {
+        let field_handle = self
+            .protocol
+            .get_field_handle(field_id)
+            .ok_or_else(|| TreeError::AddItemFailed(format!("Field '{}' not found", field_id)))?;
+
+        if !range.bytes_exist() {
+            return Err(TreeError::AddItemFailed(
+                "TvbRange extends beyond packet data".into(),
+            ));
+        }
+
         unsafe {
-            let field_handle = self.protocol.get_field_handle(field_id).ok_or_else(|| {
-                TreeError::AddItemFailed(format!("Field '{}' not found", field_id))
-            })?;
-
-            if self.tvb.offset + length > self.tvb.length() {
-                return Err(TreeError::AddItemFailed(format!(
-                    "TVB access error at offset {}",
-                    self.tvb.offset
-                )));
-            }
-
             let item = epan_sys::proto_tree_add_item(
                 self.current_node,
                 field_handle.handle,
-                self.tvb.ptr,
-                self.tvb.offset,
-                length,
+                range.tvb.as_ptr(),
+                range.offset,
+                range.length,
                 encoding.to_u32(),
             );
 
@@ -340,15 +527,98 @@ impl<'a> Tree<'a> {
                     field_id
                 )));
             }
-            let item_tvb = Tvb {
-                ptr: self.tvb.ptr,
-                start: self.tvb.offset,
-                offset: self.tvb.offset,
-            }; // the item's tvb should be starting at the offset
 
-            self.tvb.offset += length;
+            // Get the field's ETT for creating subtree
+            let ett_handle = self
+                .protocol
+                .get_ett_handle(&format!("{}_ett", field_id))
+                .or_else(|| self.protocol.get_ett_handle(ROOT_ETT_ID))
+                .ok_or(TreeError::EttNotFound("No suitable ETT found".into()))?;
 
-            Ok(TreeItem::new(item, self.pinfo, item_tvb))
+            // Convert item to subtree (Lua pattern!)
+            let subtree = epan_sys::proto_item_add_subtree(item, ett_handle);
+
+            Ok(Tree {
+                protocol: self.protocol,
+                pinfo: self.pinfo,
+                current_node: subtree,
+                current_item: item,
+            })
+        }
+    }
+
+    /// Add item and return TreeItem for expert info, text setting, etc.
+    /// Analogous to Lua API tree:add() returning a TreeItem
+    /// Reference: wslua_tree.c TreeItem_add()
+    pub fn add_item(&mut self, field_id: &str, range: TvbRange) -> TreeResult<TreeItem> {
+        let field_handle = self
+            .protocol
+            .get_field_handle(field_id)
+            .ok_or_else(|| TreeError::AddItemFailed(format!("Field '{}' not found", field_id)))?;
+
+        if !range.bytes_exist() {
+            return Err(TreeError::AddItemFailed(
+                "TvbRange extends beyond packet data".into(),
+            ));
+        }
+
+        unsafe {
+            let item = epan_sys::proto_tree_add_item(
+                self.current_node,
+                field_handle.handle,
+                range.tvb.as_ptr(),
+                range.offset,
+                range.length,
+                epan_sys::ENC_NA,
+            );
+
+            if item.is_null() {
+                return Err(TreeError::AddItemFailed(format!(
+                    "Failed to create item for field '{}'",
+                    field_id
+                )));
+            }
+
+            Ok(TreeItem::new(item, self.pinfo))
+        }
+    }
+
+    /// Add item with encoding and return TreeItem
+    pub fn add_item_with_encoding(
+        &mut self,
+        field_id: &str,
+        range: TvbRange,
+        encoding: Encoding,
+    ) -> TreeResult<TreeItem> {
+        let field_handle = self
+            .protocol
+            .get_field_handle(field_id)
+            .ok_or_else(|| TreeError::AddItemFailed(format!("Field '{}' not found", field_id)))?;
+
+        if !range.bytes_exist() {
+            return Err(TreeError::AddItemFailed(
+                "TvbRange extends beyond packet data".into(),
+            ));
+        }
+
+        unsafe {
+            let item = epan_sys::proto_tree_add_item(
+                self.current_node,
+                field_handle.handle,
+                range.tvb.as_ptr(),
+                range.offset,
+                range.length,
+                encoding.to_u32(),
+            );
+
+            if item.is_null() {
+                return Err(TreeError::AddItemFailed(format!(
+                    "Failed to create item for field '{}'",
+                    field_id
+                )));
+            }
+
+            Ok(TreeItem::new(item, self.pinfo))
         }
     }
     pub fn add_expert_info(
@@ -372,7 +642,7 @@ impl<'a> Tree<'a> {
                 let text_ptr = self.pinfo.alloc_string(text);
                 epan_sys::expert_add_info_format(
                     self.pinfo.ptr,
-                    item.ptr,
+                    item.as_ptr(),
                     &mut expert_field as *mut epan_sys::expert_field,
                     text_ptr,
                 );
@@ -380,74 +650,100 @@ impl<'a> Tree<'a> {
                 // Default text from registration
                 epan_sys::expert_add_info(
                     self.pinfo.ptr,
-                    item.ptr,
+                    item.as_ptr(),
                     &mut expert_field as *mut epan_sys::expert_field,
                 );
             }
         }
         Ok(())
     }
-    // New Tree with a different TVB buffer but within same protocol context
-    pub unsafe fn with_tvb(&self, tvb: Tvb) -> Self {
-        Self {
-            protocol: self.protocol,
-            pinfo: self.pinfo,
-            tvb,
-            current_node: self.current_node,
-            current_item: self.current_item,
+    /// Set custom text on tree item
+    pub fn set_text(&mut self, text: &str) {
+        unsafe {
+            let text_ptr = self.pinfo.alloc_string(text);
+            epan_sys::proto_item_set_text(self.current_item, text_ptr);
         }
     }
-    // Provide users a way for users to be able to pass in a closure to transform data
-    // e.g. Decompression, decryption etc.
-    pub fn transform_data(
-        &mut self,
-        length: u32,
-        transform_fn: impl FnOnce(&[u8], &mut [u8]) -> Result<(), Box<dyn std::error::Error>>,
-    ) -> Option<Tree<'a>> {
+
+    /// Append text to tree item
+    pub fn append_text(&mut self, text: &str) {
         unsafe {
-            let src_ptr = self.tvb.get_ptr(self.tvb.offset, -1);
-            let src_len = self.tvb.remaining_length(self.tvb.offset) as usize;
-            let src_data = std::slice::from_raw_parts(src_ptr, src_len);
+            let text_ptr = self.pinfo.alloc_string(text);
+            epan_sys::proto_item_append_text(self.current_item, text_ptr);
+        }
+    }
 
-            // This allocates memory for the lifetime of the packet.
-            let dst_ptr = self.pinfo.alloc_bytes(&vec![0; length as usize]);
-            let dst_data = std::slice::from_raw_parts_mut(dst_ptr, length as usize);
+    /// Set the length of this tree item (rarely needed with TvbRange)
+    pub fn set_length(&mut self, length: i32) {
+        unsafe {
+            epan_sys::proto_item_set_len(self.current_item, length);
+        }
+    }
 
-            if transform_fn(src_data, dst_data).is_err() {
-                return None;
-            }
+    /// Transform data from TvbRange (for decompression, decoding, etc.)
+    pub fn transform_data(
+        &self,
+        range: TvbRange,
+        transform_fn: impl FnOnce(&[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>>,
+        name: &str,
+    ) -> Result<Tvb, Box<dyn std::error::Error>> {
+        let src_data = range.bytes();
+        let dst_data = transform_fn(&src_data)?;
 
-            let next_tvb = self.tvb.new_child_real_data(dst_ptr, length, length)?;
+        unsafe {
+            // Allocate memory for the lifetime of the packet
+            let dst_ptr = self.pinfo.alloc_bytes(&dst_data);
+            let next_tvb = range.tvb.new_child_real_data(
+                dst_ptr,
+                dst_data.len() as u32,
+                dst_data.len() as u32,
+            )?;
 
-            self.pinfo.add_data_source(&next_tvb, "Transformed Data");
+            self.pinfo.add_data_source(&next_tvb, name);
 
-            Some(self.with_tvb(next_tvb))
+            Ok(next_tvb)
         }
     }
 }
 
+/// TreeItem represents a single protocol item in the tree
+/// Used for setting text, adding expert info, etc.
 #[derive(Clone, Copy)]
 pub struct TreeItem {
     ptr: *mut epan_sys::proto_item,
     pub pinfo: PacketInfo,
-    pub tvb: Tvb,
 }
 
 impl TreeItem {
-    pub(crate) fn new(ptr: *mut epan_sys::proto_item, pinfo: PacketInfo, tvb: Tvb) -> Self {
-        Self { ptr, pinfo, tvb }
+    pub(crate) fn new(ptr: *mut epan_sys::proto_item, pinfo: PacketInfo) -> Self {
+        Self { ptr, pinfo }
     }
+
+    /// Set custom text on this item
     pub fn set_text(&mut self, text: &str) {
         unsafe {
-            let text = self.pinfo.alloc_string(text);
-            epan_sys::proto_item_set_text(self.ptr, text);
+            let text_ptr = self.pinfo.alloc_string(text);
+            epan_sys::proto_item_set_text(self.ptr, text_ptr);
         }
     }
 
+    /// Append text to this item
     pub fn append_text(&mut self, text: &str) {
         unsafe {
-            let text = self.pinfo.alloc_string(text);
-            epan_sys::proto_item_append_text(self.ptr, text);
+            let text_ptr = self.pinfo.alloc_string(text);
+            epan_sys::proto_item_append_text(self.ptr, text_ptr);
         }
+    }
+
+    /// Set the length of this item
+    pub fn set_length(&mut self, length: i32) {
+        unsafe {
+            epan_sys::proto_item_set_len(self.ptr, length);
+        }
+    }
+
+    /// Internal getter for FFI
+    pub(crate) fn as_ptr(&self) -> *mut epan_sys::proto_item {
+        self.ptr
     }
 }

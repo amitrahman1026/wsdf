@@ -510,8 +510,8 @@ pub enum RegistrationError {
 
 #[derive(Debug, thiserror::Error)]
 pub enum DissectorError {
-    #[error("TVB access error at offset {offset}: {kind}")]
-    TvbError { offset: i32, kind: TvbErrorKind },
+    #[error("TVB error: {0}")]
+    TvbError(#[from] TvbError),
     #[error("Field not found: {0}")]
     FieldNotFound(String),
     #[error("Invalid packet data")]
@@ -529,6 +529,20 @@ pub enum TreeError {
 }
 
 #[derive(Debug, thiserror::Error)]
+pub enum TvbError {
+    #[error("Range out of bounds")]
+    OutOfBounds,
+    #[error("Invalid range parameters")]
+    InvalidRange,
+    #[error("Invalid length: expected {expected}, got {actual}")]
+    InvalidLength { expected: i32, actual: i32 },
+    #[error("Invalid encoding for operation")]
+    InvalidEncoding,
+    #[error("Failed to create subset TVB")]
+    SubsetFailed,
+}
+
+#[derive(Debug, thiserror::Error)]
 pub enum ExpertError {
     #[error("Expert field not found: {0}")]
     FieldNotFound(String),
@@ -536,19 +550,3 @@ pub enum ExpertError {
     AddFailed,
 }
 
-#[derive(Debug)]
-pub enum TvbErrorKind {
-    OutOfBounds,
-    InvalidEncoding,
-    NotEnoughData,
-}
-
-impl std::fmt::Display for TvbErrorKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TvbErrorKind::OutOfBounds => write!(f, "Out of bounds"),
-            TvbErrorKind::InvalidEncoding => write!(f, "Invalid encoding"),
-            TvbErrorKind::NotEnoughData => write!(f, "Not enough data"),
-        }
-    }
-}

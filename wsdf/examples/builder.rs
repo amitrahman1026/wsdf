@@ -7,83 +7,81 @@ pub fn build_example_protocol() -> Result<Protocol, RegistrationError> {
     let abbrev = "wsdf";
     let filter = "wsdf_example";
     let protocol = ProtocolBuilder::new(name, abbrev, filter)
-        .dissector(Dissector::new(|tree: &mut Tree<'_>| {
-            // Set protocol columns
-            tree.pinfo.set_column_text(Column::Protocol, "WSDF Example");
+        .dissector(Dissector::new(
+            |tree, tvb| -> Result<i32, Box<dyn std::error::Error>> {
+                // Set protocol columns
+                tree.pinfo.set_column_text(Column::Protocol, "WSDF Example");
 
-            // Creating a subtree to represent the header of the protocol
-            let mut header_tree = tree
-                .add_subtree("header_field", "header")
-                .expect("Unable to create header tree! Have you registered field_id and ett_id?");
-            // First field demonstrates basic field addition and expert info
-            let mut field1_item = header_tree
-                .add_item("field1", 1, Encoding::BigEndian)
-                .unwrap();
-            let _ = header_tree.add_expert_info(&mut field1_item, "expert_condition1", None);
+                // Create ranges for data access. Analogous to Lua API tvb(offset, length)
+                // Reference: wslua_tvb.c Tvb_range() - see test/lua/tvb.lua:268 for usage
+                let header_range = tvb.range(0, 3)?; // Header is 3 bytes (1 + 2)
+                let payload_range = tvb.range(3, -1)?; // Rest of packet
 
-            // Second field shows text manipulation
-            let mut field2_item = header_tree
-                .add_item("field2", 2, Encoding::BigEndian)
-                .unwrap();
-            let _ = header_tree.add_expert_info(
-                &mut field2_item,
-                "expert_condition2",
-                Some("Custom expert info with dynamic text!"),
-            );
+                // Add header subtree using range. Analogous to Lua API tree:add(field, range)
+                // Reference: wslua_tree.c TreeItem_add() - see test/lua/tvb.lua:283 for usage
+                let mut header_tree: Tree<'_> = tree.add("header_field", header_range)?;
 
-            tree.end_subtree(&header_tree);
+                // Create sub-ranges for individual fields
+                let field1_range = header_range.range(0, 1)?;
+                let field2_range = header_range.range(1, 2)?;
 
-            // Creating a subtree to represent the payload of the protocol
-            let mut payload_tree = tree.add_subtree("payload_field", "payload").expect(
-                "Unable to create payload tree! Have you registered the field_id and ett_id?",
-            );
+                // Add fields to tree and extract values
+                // field1 demonstrates basic field addition and expert info
+                let mut field1_item: TreeItem = header_tree.add_item("field1", field1_range)?;
+                let _ = tree.add_expert_info(&mut field1_item, "expert_condition1", None);
 
-            // Compression flag and original size
-            let mut flag_item: TreeItem = payload_tree
-                .add_item("comp_flag", 1, Encoding::BigEndian)
-                .unwrap();
-            let flag_value = flag_item
-                .tvb
-                .get_uint8(payload_tree.tvb.start)
-                .expect("out of bounds");
-
-            let mut size_item = payload_tree
-                .add_item("orig_size", 2, Encoding::BigEndian)
-                .unwrap();
-            let orig_size = size_item
-                .tvb
-                .get_uint16(payload_tree.tvb.offset, Encoding::BigEndian)
-                .expect("Out of bounds") as u32;
-
-            tree.end_subtree(&payload_tree);
-
-            // Example transformation based on flag
-            if flag_value & 0x80 != 0 {
-                // Check MSB for compression flag
-                flag_item.append_text(" (Compressed data)");
-                size_item.append_text(
-                    format!(" ({} bytes after decompression)", orig_size * 2).as_str(),
+                // field2 demonstrates text manipulation
+                let mut field2_item: TreeItem = header_tree.add_item("field2", field2_range)?;
+                let _ = tree.add_expert_info(
+                    &mut field2_item,
+                    "expert_condition2",
+                    Some("Custom expert info with dynamic text!"),
                 );
 
-                // Our example "decompression" function simply duplicates each byte
-                // In real protocols this would be actual decompression
-                if let Some(mut decompressed_tree) =
-                    payload_tree.transform_data(orig_size, |src, dst| {
-                        let mut dst_idx = 0;
-                        for &byte in src.iter() {
-                            if dst_idx + 1 < dst.len() {
-                                dst[dst_idx] = byte;
-                                dst[dst_idx + 1] = byte;
-                                dst_idx += 2;
+                // Creating a subtree to represent the payload of the protocol
+                let mut payload_tree: Tree<'_> = tree.add("payload_field", payload_range)?;
+
+                // Create ranges for payload fields
+                let flag_range = payload_range.range(0, 1)?;
+                let size_range = payload_range.range(1, 2)?;
+
+                // Add payload fields and extract values
+                // Analogous to Lua API tree:add() and range:uint() - see test/lua/tvb.lua:315-322
+                let mut flag_item: TreeItem = payload_tree.add_item("comp_flag", flag_range)?;
+                let flag_value = flag_range.uint8()?; // Like Lua's TvbRange:uint()
+
+                let mut size_item: TreeItem = payload_tree.add_item("orig_size", size_range)?;
+                let orig_size = size_range.uint16(Encoding::BigEndian)? as u32; // Like Lua's TvbRange:uint()
+
+                // Example transformation based on flag
+                if flag_value & 0x80 != 0 {
+                    // Check MSB for compression flag
+                    flag_item.append_text(" (Compressed data)");
+                    size_item
+                        .append_text(&format!(" ({} bytes after decompression)", orig_size * 2));
+
+                    // Get the remaining payload data range for transformation
+                    let compressed_range = payload_range.range(3, -1)?;
+
+                    // Our example "decompression" function simply duplicates each byte
+                    // In real protocols this would be actual decompression
+                    let decompressed_tvb = tree.transform_data(
+                        compressed_range,
+                        |src| {
+                            let mut dst = Vec::with_capacity(src.len() * 2);
+                            for &byte in src {
+                                dst.push(byte);
+                                dst.push(byte); // Duplicate each byte
                             }
-                        }
-                        Ok(())
-                    })
-                {
-                    // Transformed decompressed data can be added as a new field
-                    let mut payload_item = decompressed_tree
-                        .add_item("decompressed_data", orig_size as i32, Encoding::NA)
-                        .unwrap();
+                            Ok(dst)
+                        },
+                        "Decompressed Data",
+                    )?;
+
+                    // Add the decompressed data as a new field
+                    let decompressed_range = decompressed_tvb.range_all();
+                    let mut payload_item =
+                        tree.add_item("decompressed_data", decompressed_range)?;
 
                     let _ = tree.add_expert_info(
                         &mut payload_item,
@@ -91,28 +89,29 @@ pub fn build_example_protocol() -> Result<Protocol, RegistrationError> {
                         Some("Data was decompressed - each byte duplicated"),
                     );
 
-                    let _ = tree.pinfo.set_column_text(
+                    tree.pinfo.set_column_text(
                         Column::Info,
                         &format!("Decompressed {} bytes of data", orig_size),
                     );
+                } else {
+                    flag_item.append_text(" (Uncompressed data)");
+
+                    // Show raw bytes for uncompressed data
+                    let raw_data_range = payload_range.range(3, 4)?;
+                    let mut payload_item: TreeItem = tree.add_item("raw_data", raw_data_range)?;
+                    let _ = tree.add_expert_info(
+                        &mut payload_item,
+                        "expert_transform",
+                        Some("Uncompressed data shown directly!"),
+                    );
+
+                    tree.pinfo
+                        .set_column_text(Column::Info, "Uncompressed data");
                 }
-            } else {
-                flag_item.append_text(" (Uncompressed data)");
 
-                // Just show raw bytes for uncompressed data
-                let mut payload_item = tree.add_item("raw_data", 4, Encoding::NA).unwrap();
-                let _ = tree.add_expert_info(
-                    &mut payload_item,
-                    "expert_transform",
-                    Some("Uncompressed data shown directly!"),
-                );
-
-                tree.pinfo
-                    .set_column_text(Column::Info, "Uncompressed data");
-            }
-
-            tree.get_reported_length()
-        }))
+                Ok(tvb.reported_length())
+            },
+        ))
         .ett("header", "Header Fields")
         .ett("payload", "Payload Fields")
         .field(
