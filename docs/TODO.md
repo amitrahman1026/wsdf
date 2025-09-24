@@ -82,19 +82,115 @@ Create integration testing for wsdf generated plugins
     this using a tshark based flow.
 
 
-Improve cross platform building and pin releases to wireshark versions
+Build System Enhancements (Probably will priotise this)
 
-    Portability options have been provided for macOS solving some users reported
-    issues. However it would be great to explore using cargo to handle this. 
+    Current Issues Identified:
+        - macOS Wireshark.app bundle detection fails (libwireshark.18.dylib not found)
+        - No platform-specific library path detection
+        - Missing versioned library handling (libwireshark.18 vs libwireshark)
+        - No soname generation for cdylibs (required for Linux packaging)
+        - Limited cross-compilation support
+        - No post-build rpath fixing for macOS app bundles
+        - Poor error messages with no actionable guidance
+        - No proper shared library link arguments for cross-platform compatibility
 
-    On top of that, there should be a better way to decouple and allow for
-    flexibility of the underlying wireshark system. Currently beyond the git
-    submodule commit, there is not a more robust pinned version of wireshark.
+    Enhanced Multi-Tier Detection Strategy:
+        1. Cargo.toml metadata configuration (target-specific overrides)
+        2. Environment variables (WIRESHARK_LIB_DIR, WIRESHARK_VERSION)
+        3. Platform-specific auto-detection with multiple search paths
+        4. pkg-config fallback
+        5. Smoke test compilation (libz-sys approach)
+        6. Source build as last resort
 
-    It may be worthwhile to explore extending the build.rs or cargo xtasks for 
-    more rigid portability
+    Platform-Specific Detection Paths:
+        macOS:
+            - /Applications/Wireshark.app/Contents/Frameworks (versioned dylibs)
+            - /opt/homebrew/lib (Apple Silicon Homebrew)
+            - /usr/local/lib (Intel Homebrew)
+            - /opt/local/lib (MacPorts)
 
-    Windows remain untested.
+        Linux:
+            - /usr/lib/x86_64-linux-gnu (Ubuntu/Debian multiarch)
+            - /usr/lib64, /usr/lib (standard locations)
+            - /usr/local/lib (custom builds)
+            - Distribution-specific paths
+
+        Windows:
+            - C:\Program Files\Wireshark
+            - Registry-based detection
+            - DLL search path configuration
+
+    Cargo.toml Metadata Integration:
+        [package.metadata.wsdf]
+        verbose_build = true
+        generate_soname = true
+        fix_rpaths = true
+
+        [package.metadata.wsdf.target."aarch64-apple-darwin"]
+        wireshark_lib_dir = "/Applications/Wireshark.app/Contents/Frameworks"
+        fix_app_bundle_rpaths = true
+        preferred_version = "18"
+
+    User Workflow Support:
+        Zero Config (90% users):
+            cargo build --example builder
+            cargo post build --example builder (with post-processing)
+
+        Environment Override (8% users):
+            WIRESHARK_LIB_DIR=/path cargo build
+            WIRESHARK_VERSION=18 cargo build
+
+        Advanced Configuration (2% users):
+            Target-specific Cargo.toml metadata
+            Cross-compilation support
+            CI/CD integration
+
+    cdylib soname Generation (inspired by cdylib-link-lines crate):
+        - Automatic soname for versions >= 1.0.0
+        - Format: libname.so.{major_version}
+        - Linux: -Wl,-soname,libname.so.1
+        - macOS: -Wl,-install_name,@rpath/libname.dylib
+        - Reference: https://github.com/lu-zero/cdylib-link-lines
+
+    Post-Build Processing (post_build.rs):
+        macOS:
+            - Fix rpath for Wireshark.app bundles
+            - Set proper install_name with @rpath
+            - install_name_tool integration
+
+        Linux:
+            - Verify soname is set correctly
+            - Optional plugin installation
+
+        All Platforms:
+            - Automatic plugin directory installation
+            - Build artifact validation
+
+    Professional Error Handling:
+        - Clear platform-specific installation instructions
+        - Actionable error messages with solutions
+        - Library version compatibility checking
+        - Development headers validation
+
+    Dependencies to Add:
+        build-target = "0.4"     # Target detection
+        cargo_metadata = "0.18"  # Metadata reading
+        semver = "1.0"          # Version parsing
+        cargo-post (user install) # Post-build processing
+
+    Implementation Priority:
+        1. Enhanced platform detection in build.rs
+        2. Cargo.toml metadata support
+        3. Post-build script for rpath/soname
+        4. Professional error handling
+        5. Cross-compilation testing
+        6. Documentation and examples
+
+    Windows Testing:
+        Currently untested and needs investigation for:
+        - Library detection methods
+        - DLL search path configuration
+        - Visual Studio vs MinGW compatibility
 
 Code Generation Research and Future Automation
 
