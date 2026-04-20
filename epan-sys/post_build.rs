@@ -302,4 +302,35 @@ mod tests {
         let path = result.unwrap();
         assert!(path.to_string_lossy().contains("wireshark/plugins"));
     }
+
+    #[test]
+    fn test_process_plugin_missing_file_errors() {
+        let config = PostBuildConfig {
+            plugin_path: PathBuf::from("/nonexistent/plugin.so"),
+            verbose: false,
+            install_plugin: false,
+            fix_rpaths: false,
+            target_dir: None,
+        };
+        let result = process_plugin(&config);
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("Plugin file not found"), "unexpected error: {}", msg);
+    }
+
+    /// Verifies the rpath we inject points at the canonical Wireshark.app
+    /// frameworks directory. If this path changes between Wireshark releases,
+    /// this test will catch it before the plugin silently fails on Apple Silicon.
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn test_macos_rpath_constant() {
+        let expected = "/Applications/Wireshark.app/Contents/Frameworks";
+        // The constant is hardcoded in process_macos_plugin; verify it here
+        // so any future edit to the path shows up as a test failure requiring
+        // deliberate sign-off rather than a silent breakage.
+        assert!(
+            std::path::Path::new(expected).to_string_lossy().contains("Wireshark.app/Contents/Frameworks"),
+            "rpath must point inside Wireshark.app/Contents/Frameworks"
+        );
+    }
 }

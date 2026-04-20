@@ -667,32 +667,21 @@ fn fallback_dependency_linking(config: &WiresharkConfig) {
 }
 
 fn configure_soname_if_cdylib(metadata_config: &MetadataConfig) {
-    // Only apply soname generation for cdylib crate types
-    if is_cdylib_target() && metadata_config.generate_soname {
-        let version = env::var("CARGO_PKG_VERSION").unwrap_or_default();
-        if let Ok(semver_version) = semver::Version::parse(&version) {
-            generate_soname_args(&semver_version);
-            if metadata_config.verbose_build {
-                println!("cargo:warning=Generated soname for version {}", version);
-            }
-        }
-    } else if is_cdylib_target() {
-        // Default behavior when not explicitly disabled
-        let version = env::var("CARGO_PKG_VERSION").unwrap_or_default();
-        if let Ok(semver_version) = semver::Version::parse(&version) {
-            generate_soname_args(&semver_version);
+    // epan-sys's build script cannot detect whether the downstream plugin crate
+    // is a cdylib — Cargo does not expose the consumer's crate type to a
+    // dependency's build script. Soname generation is therefore opt-in: set
+    // `generate_soname = true` in `[package.metadata.wsdf]` of the plugin's
+    // own Cargo.toml to enable it.
+    if !metadata_config.generate_soname {
+        return;
+    }
+    let version = env::var("CARGO_PKG_VERSION").unwrap_or_default();
+    if let Ok(semver_version) = semver::Version::parse(&version) {
+        generate_soname_args(&semver_version);
+        if metadata_config.verbose_build {
+            println!("cargo:warning=Generated soname for version {}", version);
         }
     }
-}
-
-fn is_cdylib_target() -> bool {
-    // Check if we're building a cdylib (look for examples or check crate type)
-    env::var("CARGO_PKG_NAME")
-        .map(|name| name == "builder" || name.contains("example"))
-        .unwrap_or(false)
-        || env::var("CARGO_CRATE_NAME")
-            .map(|name| name == "builder" || name.contains("example"))
-            .unwrap_or(false)
 }
 
 fn generate_soname_args(version: &semver::Version) {
