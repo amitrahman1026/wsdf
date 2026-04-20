@@ -22,9 +22,9 @@ macrotest = "1"
 epan-sys = { path = "../epan-sys", version = "0.2.0" }
 thiserror = "1.0"
 
-# [[test]]
-# name = "unit"
-# path = "tests/unit/mod.rs"
+[[test]]
+name = "integration_test"
+path = "../tests/integration_test.rs"
 
 # [[example]]
 # name = "udp"
