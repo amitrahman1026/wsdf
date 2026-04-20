@@ -165,6 +165,34 @@ fn process_macos_plugin(config: &PostBuildConfig) -> Result<(), Box<dyn std::err
         }
     }
 
+    // Add an LC_RPATH entry so the dynamic linker can resolve @rpath references.
+    // Without this, the -change steps above embed @rpath/... references that
+    // can never be resolved (the plugin has no rpath of its own).
+    let rpath = "/Applications/Wireshark.app/Contents/Frameworks";
+    let rpath_status = Command::new("install_name_tool")
+        .args(["-add_rpath", rpath])
+        .arg(&config.plugin_path)
+        .status()?;
+    // -add_rpath exits non-zero if the rpath already exists; treat as warning.
+    if !rpath_status.success() && config.verbose {
+        println!("Note: rpath {} may already be present", rpath);
+    }
+
+    // Re-sign after install_name_tool modifications. On Apple Silicon with the
+    // hardened runtime any modification to a Mach-O binary invalidates its
+    // signature and causes dlopen to silently reject the plugin.
+    // Ad-hoc signing (-) requires only the system codesign binary.
+    let sign_status = Command::new("codesign")
+        .args(["--force", "--sign", "-"])
+        .arg(&config.plugin_path)
+        .status()?;
+    if !sign_status.success() {
+        return Err("codesign failed — plugin signature is invalid".into());
+    }
+    if config.verbose {
+        println!("Re-signed plugin after install_name_tool modifications");
+    }
+
     // If plugin is .dylib, rename to .so for Wireshark compatibility
     if config.plugin_path.extension().and_then(|s| s.to_str()) == Some("dylib") {
         let mut new_path = config.plugin_path.clone();
