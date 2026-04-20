@@ -16,8 +16,12 @@
 //!
 //! ## Quick Start Guide
 //!
-//! ```rust
-//! use wsdf::{plugin, ProtocolBuilder, Dissector, FieldBuilder, FieldType, Encoding};
+//! ```rust,no_run
+//! use wsdf::wireshark::{
+//!     ProtocolBuilder, Dissector, FieldBuilder, FieldType, Encoding, 
+//!     Protocol, RegistrationError, ExpertGroup, ExpertSeverity, Plugin
+//! };
+//! use wsdf::plugin;
 //!
 //! // Define your protocol fields
 //! fn build_protocol() -> Result<Protocol, RegistrationError> {
@@ -38,9 +42,9 @@
 //!         ExpertSeverity::Error,
 //!         "Malformed packet"
 //!     )
-//!     .dissector(Dissector::new(|tree| {
+//!     .dissector(Dissector::new(|tree, tvb| {
 //!         // Dissection logic here
-//!         0
+//!         Ok(0)
 //!     }))
 //!     .build()
 //! }
@@ -55,7 +59,7 @@
 //!
 //! WSDF uses a layered architecture:
 //!
-//! ```
+//! ```text
 //! +-------------------+
 //! |     User Code     |
 //! +-------------------+

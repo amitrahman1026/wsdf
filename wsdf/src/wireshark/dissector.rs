@@ -9,7 +9,8 @@ use std::ffi::{c_char, c_int};
 ///
 /// # Example
 ///
-/// ```rust
+/// ```rust,no_run
+/// use wsdf::wireshark::Dissector;
 /// let dissector = Dissector::new(|tree, tvb| {
 ///     // Create ranges for data access. Analogous to Lua API tvb(offset, length)
 ///     // Reference: wslua_tvb.c Tvb_range()
