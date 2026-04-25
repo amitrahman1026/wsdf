@@ -7,6 +7,7 @@ use std::env;
 use std::fs::File;
 use std::io::Cursor;
 use std::path::PathBuf;
+#[cfg(any(feature = "source-build", feature = "bindgen"))]
 use std::process::Command;
 
 #[derive(Debug)]
@@ -741,6 +742,7 @@ fn generate_bindings() {
         .expect("generated bindings should be written to file");
 }
 
+#[cfg(any(feature = "source-build", feature = "bindgen"))]
 fn clone_wireshark_or_die() {
     Command::new("git")
         .args(["submodule", "update", "--init", "--recursive", "wireshark"])
@@ -748,6 +750,7 @@ fn clone_wireshark_or_die() {
         .expect("wireshark should be obtained as a git submodule");
 }
 
+#[cfg(any(feature = "source-build", feature = "bindgen"))]
 fn build_wireshark() -> PathBuf {
     let result = std::panic::catch_unwind(|| {
         let dst = cmake::Config::new("wireshark")
