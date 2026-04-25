@@ -154,17 +154,27 @@ fn process_macos_plugin(config: &PostBuildConfig) -> Result<PathBuf, Box<dyn std
                 .find(|line| line.contains(&format!("@rpath/{}", lib_name)))
                 .and_then(|line| line.trim().split_whitespace().next())
             {
+                // Skip if already in the correct @rpath form — install_name_tool
+                // still writes the binary even for a no-op change, which fails
+                // when there is no headerpad space.
+                if dep == rpath_ref {
+                    if config.verbose {
+                        println!("Already correct: {}", dep);
+                    }
+                    continue;
+                }
+
                 if config.verbose {
                     println!("Fixing {} -> {}", dep, rpath_ref);
                 }
-                
+
                 let status = Command::new("install_name_tool")
                     .arg("-change")
                     .arg(dep)
                     .arg(rpath_ref)
                     .arg(&config.plugin_path)
                     .status()?;
-                
+
                 if !status.success() {
                     eprintln!("Warning: Failed to fix rpath for {}", dep);
                 }
