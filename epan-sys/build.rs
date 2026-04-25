@@ -135,12 +135,17 @@ fn load_metadata_config() -> Result<MetadataConfig, BuildError> {
 }
 
 fn find_wireshark_config(metadata_config: &MetadataConfig) -> Result<WiresharkConfig, BuildError> {
-    try_metadata_config(metadata_config)
+    let result = try_metadata_config(metadata_config)
         .or_else(|_| try_environment_config())
         .or_else(|_| try_pkg_config())
         .or_else(|_| try_platform_detection(metadata_config))
-        .or_else(|_| try_smoke_test())
-        .or_else(|_| fallback_source_build())
+        .or_else(|_| try_smoke_test());
+
+    // Source build clones ~200 MB and takes several minutes. Opt-in only.
+    #[cfg(feature = "source-build")]
+    let result = result.or_else(|_| fallback_source_build());
+
+    result
 }
 
 fn try_metadata_config(metadata_config: &MetadataConfig) -> Result<WiresharkConfig, BuildError> {
@@ -246,83 +251,22 @@ fn try_platform_detection(metadata_config: &MetadataConfig) -> Result<WiresharkC
 }
 
 fn try_smoke_test() -> Result<WiresharkConfig, BuildError> {
-    // Create a temporary C file to test compilation against Wireshark headers
-    use std::fs;
-    use std::io::Write;
+    // Compile src/smoke.c against standard include paths using the cc crate.
+    // try_compile produces an object file only — no linking, no binary execution.
+    // This makes it safe for cross-compilation and avoids needing libwireshark
+    // in the linker search path at this stage.
+    let compiled = cc::Build::new()
+        .file("src/smoke.c")
+        .try_compile("smoke_wireshark")
+        .is_ok();
 
-    let out_dir = env::var("OUT_DIR").unwrap_or_else(|_| "/tmp".to_string());
-    let smoke_c = PathBuf::from(&out_dir).join("smoke.c");
-    let smoke_exe = PathBuf::from(&out_dir).join("smoke");
-
-    let smoke_code = r#"
-#include <stdio.h>
-
-// Try to include basic Wireshark headers that should be available
-// if libwireshark-dev is installed but pkg-config fails
-#ifdef __has_include
-  #if __has_include(<epan/epan.h>)
-    #include <epan/epan.h>
-    #define HAVE_EPAN 1
-  #endif
-  #if __has_include(<wireshark/epan/epan.h>)
-    #include <wireshark/epan/epan.h>
-    #define HAVE_EPAN 1
-  #endif
-#endif
-
-int main() {
-#ifdef HAVE_EPAN
-    // Try to use a simple function to verify we can link
-    printf("Smoke test passed\n");
-    return 0;
-#else
-    printf("Smoke test failed: headers not found\n");
-    return 1;
-#endif
-}
-"#;
-
-    // Write smoke test file
-    if let Ok(mut file) = fs::File::create(&smoke_c) {
-        if file.write_all(smoke_code.as_bytes()).is_err() {
-            return Err(BuildError::SmokeTestFailed(
-                "Failed to write smoke test".to_string(),
-            ));
-        }
+    if compiled {
+        infer_from_system_paths()
     } else {
-        return Err(BuildError::SmokeTestFailed(
-            "Failed to create smoke test file".to_string(),
-        ));
+        Err(BuildError::SmokeTestFailed(
+            "Wireshark headers not found in standard include paths".to_string(),
+        ))
     }
-
-    // Try to compile the smoke test
-    let output = Command::new("cc")
-        .arg("-o")
-        .arg(&smoke_exe)
-        .arg(&smoke_c)
-        .arg("-lwireshark")
-        .output();
-
-    if let Ok(result) = output {
-        if result.status.success() {
-            // Try to run the smoke test
-            let run_output = Command::new(&smoke_exe).output();
-            if let Ok(run_result) = run_output {
-                if run_result.status.success() {
-                    // Smoke test passed, try to determine library locations
-                    return infer_from_system_paths();
-                }
-            }
-        }
-    }
-
-    // Clean up
-    let _ = fs::remove_file(&smoke_c);
-    let _ = fs::remove_file(&smoke_exe);
-
-    Err(BuildError::SmokeTestFailed(
-        "Smoke test compilation or execution failed".to_string(),
-    ))
 }
 
 fn infer_from_system_paths() -> Result<WiresharkConfig, BuildError> {
@@ -515,6 +459,7 @@ fn extract_version_from_filename(filename: &str) -> Option<String> {
     None
 }
 
+#[cfg(feature = "source-build")]
 fn fallback_source_build() -> Result<WiresharkConfig, BuildError> {
     println!("cargo:warning=libwireshark was not found, will be built from source");
 
