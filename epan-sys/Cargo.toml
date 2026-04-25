@@ -21,11 +21,9 @@ doctest = false # because the comments in generated bindings aren't even Rust co
 
 [build-dependencies]
 pkg-config = "0.3"
-cmake = "0.1"
+cmake = { version = "0.1", optional = true }
 bindgen = { version = "0.66", optional = true }
 semver = "1.0"
-mach_object = "0.1"
-build-target = "0.4"
 cargo_metadata = "0.18"
 cc = "1"
 
@@ -34,4 +32,4 @@ cc = "1"
 bindgen = ["dep:bindgen"]
 # Allow falling back to cloning and building Wireshark from source (~200 MB).
 # Off by default to avoid silent multi-minute downloads on first build.
-source-build = []
+source-build = ["dep:cmake"]

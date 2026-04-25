@@ -2,10 +2,7 @@
 extern crate bindgen;
 
 use cargo_metadata::MetadataCommand;
-use mach_object::{LoadCommand, OFile};
 use std::env;
-use std::fs::File;
-use std::io::Cursor;
 use std::path::PathBuf;
 #[cfg(any(feature = "source-build", feature = "bindgen"))]
 use std::process::Command;
@@ -118,8 +115,7 @@ fn load_metadata_config() -> Result<MetadataConfig, BuildError> {
         }
 
         // Check for target-specific configuration
-        let target = env::var("TARGET")
-            .unwrap_or_else(|_| build_target::target_triple().unwrap_or("unknown".to_string()));
+        let target = env::var("TARGET").unwrap_or_else(|_| "unknown".to_string());
         if let Some(target_config) = wsdf_metadata.get(&format!("target.{}", target)) {
             if let Some(lib_dir) = target_config.get("wireshark_lib_dir") {
                 if let Some(path_str) = lib_dir.as_str() {
@@ -503,29 +499,17 @@ fn configure_linking(config: &WiresharkConfig, metadata_config: &MetadataConfig)
         config.lib_dir.display()
     );
 
-    // Parse dependencies dynamically from libwireshark
-    let wireshark_lib_path = config.lib_dir.join(format!("lib{}.dylib", config.lib_name));
-    if wireshark_lib_path.exists() {
-        if let Ok(deps) = parse_library_dependencies(&wireshark_lib_path) {
-            println!(
-                "cargo:warning=Discovered {} dependencies from {}",
-                deps.len(),
-                wireshark_lib_path.display()
-            );
-            for dep in deps {
-                println!("cargo:warning=Linking dependency: {}", dep);
-                println!("cargo:rustc-link-lib=dylib={}", dep);
-            }
-        } else {
-            println!("cargo:warning=Failed to parse dependencies, using fallback");
-            fallback_dependency_linking(config);
-        }
-    } else {
-        println!(
-            "cargo:warning=Library file not found at {}, using fallback",
-            wireshark_lib_path.display()
-        );
+    // Discover wsutil/wiretap by scanning the library directory for versioned
+    // filenames (e.g. libwsutil.16.dylib on macOS). Simpler than Mach-O parsing
+    // and works on all platforms.
+    let deps = scan_wireshark_dependencies(&config.lib_dir);
+    if deps.is_empty() {
         fallback_dependency_linking(config);
+    } else {
+        for dep in &deps {
+            println!("cargo:warning=Linking dependency: {}", dep);
+            println!("cargo:rustc-link-lib=dylib={}", dep);
+        }
     }
 
     // For macOS, set rpath
@@ -555,46 +539,31 @@ fn configure_linking(config: &WiresharkConfig, metadata_config: &MetadataConfig)
     println!("cargo:rustc-env=WSDF_LIB_DIR={}", config.lib_dir.display());
 }
 
-fn parse_library_dependencies(
-    lib_path: &PathBuf,
-) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    use std::io::Read;
-
-    let mut file = File::open(lib_path)?;
-    let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer)?;
-
-    let mut cursor = Cursor::new(&buffer[..]);
-    let ofile = OFile::parse(&mut cursor)?;
-
-    let mut dependencies = Vec::new();
-
-    if let OFile::MachFile { commands, .. } = ofile {
-        for command in commands {
-            if let LoadCommand::LoadDyLib(ref dylib) = command.command() {
-                let lib_name = extract_wireshark_lib_name(&dylib.name);
-                if let Some(name) = lib_name {
-                    dependencies.push(name);
-                }
-            }
-        }
-    }
-
-    Ok(dependencies)
+fn scan_wireshark_dependencies(lib_dir: &PathBuf) -> Vec<String> {
+    ["wsutil", "wiretap"]
+        .iter()
+        .filter_map(|base| find_dep_lib_name(lib_dir, base))
+        .collect()
 }
 
-fn extract_wireshark_lib_name(full_path: &str) -> Option<String> {
-    // Extract library name from paths like "@rpath/libwsutil.16.dylib"
-    if let Some(filename) = full_path.split('/').last() {
-        if filename.starts_with("lib")
-            && (filename.contains("wsutil") || filename.contains("wiretap"))
-        {
-            // Remove "lib" prefix and ".dylib" suffix
-            if let Some(name) = filename.strip_prefix("lib") {
-                if let Some(name) = name.strip_suffix(".dylib") {
-                    return Some(name.to_string());
-                }
+fn find_dep_lib_name(lib_dir: &PathBuf, base: &str) -> Option<String> {
+    let prefix = format!("lib{}.", base);
+    let entries = std::fs::read_dir(lib_dir).ok()?;
+    for entry in entries.flatten() {
+        let filename = entry.file_name();
+        let name = filename.to_string_lossy();
+        if !name.starts_with(&prefix) {
+            continue;
+        }
+        // macOS: libwsutil.16.dylib → "wsutil.16"
+        if let Some(inner) = name.strip_prefix(&prefix).and_then(|s| s.strip_suffix(".dylib")) {
+            if inner.chars().all(|c| c.is_ascii_digit()) {
+                return Some(format!("{}.{}", base, inner));
             }
+        }
+        // Linux: libwsutil.so or libwsutil.so.N → "wsutil"
+        if name.contains(".so") {
+            return Some(base.to_string());
         }
     }
     None
