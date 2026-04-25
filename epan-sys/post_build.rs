@@ -23,6 +23,7 @@ struct PostBuildConfig {
     install_plugin: bool,
     fix_rpaths: bool,
     target_dir: Option<PathBuf>,
+    wireshark_version: Option<String>,
 }
 
 fn main() {
@@ -39,6 +40,7 @@ fn main() {
         install_plugin: false,
         fix_rpaths: true,
         target_dir: None,
+        wireshark_version: None,
     };
 
     // Parse additional arguments
@@ -50,6 +52,11 @@ fn main() {
             "--target-dir" => {
                 if i + 1 < args.len() {
                     config.target_dir = Some(PathBuf::from(&args[i + 1]));
+                }
+            }
+            "--wireshark-version" => {
+                if i + 1 < args.len() {
+                    config.wireshark_version = Some(args[i + 1].clone());
                 }
             }
             _ => {}
@@ -267,8 +274,36 @@ fn process_windows_plugin(config: &PostBuildConfig) -> Result<(), Box<dyn std::e
     Ok(())
 }
 
+fn detect_wireshark_version() -> Option<String> {
+    let output = Command::new("tshark").arg("--version").output().ok()?;
+    let text = String::from_utf8_lossy(&output.stdout);
+    for line in text.lines() {
+        if let Some(rest) = line.strip_prefix("TShark (Wireshark) ") {
+            let ver = rest.split_whitespace().next()?;
+            let mut parts = ver.splitn(3, '.');
+            let major = parts.next()?;
+            let minor = parts.next()?;
+            return Some(format!("{}.{}", major, minor));
+        }
+    }
+    None
+}
+
+// On macOS, Wireshark uses hyphens in the version directory name to prevent
+// Apple's codesign machinery from treating it as a bundle (Wireshark CMakeLists.txt:1684).
+// On Linux and Windows, dots are used.
+fn plugin_path_id(version: &str) -> String {
+    #[cfg(target_os = "macos")]
+    return version.replace('.', "-");
+    #[cfg(not(target_os = "macos"))]
+    return version.to_string();
+}
+
 fn install_plugin(config: &PostBuildConfig, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let plugin_dir = get_wireshark_plugin_dir()?;
+    let version = config.wireshark_version.clone()
+        .or_else(detect_wireshark_version)
+        .unwrap_or_else(|| "4.4".to_string());
+    let plugin_dir = get_wireshark_plugin_dir(&version)?;
 
     if !plugin_dir.exists() {
         fs::create_dir_all(&plugin_dir)?;
@@ -293,26 +328,25 @@ fn install_plugin(config: &PostBuildConfig, path: &Path) -> Result<(), Box<dyn s
     Ok(())
 }
 
-fn get_wireshark_plugin_dir() -> Result<PathBuf, Box<dyn std::error::Error>> {
-    let home = env::var("HOME")?;
-    let base_path = PathBuf::from(home).join(".local/lib/wireshark/plugins");
+fn get_wireshark_plugin_dir(version: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let path_id = plugin_path_id(version);
 
-    // macOS Wireshark uses hyphens (4-4); Linux uses dots (4.4). Search both,
-    // hyphenated first so an existing directory wins over creating a new one.
-    let version_dirs = ["4-4", "4.4", "4-3", "4.3", "4-2", "4.2", "4-6", "4.6"];
-
-    for version in &version_dirs {
-        let plugin_dir = base_path.join(version).join("epan");
-        if plugin_dir.exists() {
-            return Ok(plugin_dir);
-        }
+    // Windows personal plugin dir: %APPDATA%\Wireshark\plugins\{path_id}\epan
+    // All other platforms:         $HOME/.local/lib/wireshark/plugins/{path_id}/epan
+    // Source: wsutil/filesystem.c init_plugin_pers_dir()
+    #[cfg(target_os = "windows")]
+    {
+        let appdata = env::var("APPDATA")?;
+        return Ok(PathBuf::from(appdata)
+            .join("Wireshark").join("plugins").join(&path_id).join("epan"));
     }
 
-    // Nothing exists yet — default to platform convention
-    #[cfg(target_os = "macos")]
-    return Ok(base_path.join("4-4").join("epan"));
-    #[cfg(not(target_os = "macos"))]
-    return Ok(base_path.join("4.4").join("epan"));
+    #[cfg(not(target_os = "windows"))]
+    {
+        let home = env::var("HOME")?;
+        Ok(PathBuf::from(home)
+            .join(".local/lib/wireshark/plugins").join(&path_id).join("epan"))
+    }
 }
 
 #[cfg(test)]
@@ -321,10 +355,13 @@ mod tests {
 
     #[test]
     fn test_plugin_dir_detection() {
-        let result = get_wireshark_plugin_dir();
-        assert!(result.is_ok());
-        let path = result.unwrap();
-        assert!(path.to_string_lossy().contains("wireshark/plugins"));
+        let path = get_wireshark_plugin_dir("4.4").unwrap();
+        assert!(path.to_string_lossy().contains("wireshark"));
+        assert!(path.ends_with("epan"));
+        #[cfg(target_os = "macos")]
+        assert!(path.to_string_lossy().contains("4-4"), "macOS must use hyphens, got: {}", path.display());
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        assert!(path.to_string_lossy().contains("4.4"), "Linux must use dots, got: {}", path.display());
     }
 
     #[test]
@@ -335,6 +372,7 @@ mod tests {
             install_plugin: false,
             fix_rpaths: false,
             target_dir: None,
+            wireshark_version: None,
         };
         let result = process_plugin(&config);
         assert!(result.is_err());
