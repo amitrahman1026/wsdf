@@ -14,6 +14,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+const WIRESHARK_APP_FRAMEWORKS: &str = "/Applications/Wireshark.app/Contents/Frameworks";
+
 #[derive(Debug)]
 struct PostBuildConfig {
     plugin_path: PathBuf,
@@ -185,7 +187,7 @@ fn process_macos_plugin(config: &PostBuildConfig) -> Result<PathBuf, Box<dyn std
     // Add an LC_RPATH entry so the dynamic linker can resolve @rpath references.
     // Without this, the -change steps above embed @rpath/... references that
     // can never be resolved (the plugin has no rpath of its own).
-    let rpath = "/Applications/Wireshark.app/Contents/Frameworks";
+    let rpath = WIRESHARK_APP_FRAMEWORKS;
     let rpath_status = Command::new("install_name_tool")
         .args(["-add_rpath", rpath])
         .arg(&config.plugin_path)
@@ -340,19 +342,16 @@ mod tests {
         assert!(msg.contains("Plugin file not found"), "unexpected error: {}", msg);
     }
 
-    /// Verifies the rpath we inject points at the canonical Wireshark.app
-    /// frameworks directory. If this path changes between Wireshark releases,
-    /// this test will catch it before the plugin silently fails on Apple Silicon.
+    /// Canary for the Wireshark.app frameworks rpath injected on macOS.
+    /// If the constant changes, this test fails and forces deliberate sign-off
+    /// rather than a silent load failure on Apple Silicon.
     #[test]
     #[cfg(target_os = "macos")]
     fn test_macos_rpath_constant() {
-        let expected = "/Applications/Wireshark.app/Contents/Frameworks";
-        // The constant is hardcoded in process_macos_plugin; verify it here
-        // so any future edit to the path shows up as a test failure requiring
-        // deliberate sign-off rather than a silent breakage.
-        assert!(
-            std::path::Path::new(expected).to_string_lossy().contains("Wireshark.app/Contents/Frameworks"),
-            "rpath must point inside Wireshark.app/Contents/Frameworks"
+        assert_eq!(
+            WIRESHARK_APP_FRAMEWORKS,
+            "/Applications/Wireshark.app/Contents/Frameworks",
+            "rpath constant changed — verify the new path before approving"
         );
     }
 }
