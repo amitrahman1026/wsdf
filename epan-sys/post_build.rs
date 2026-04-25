@@ -69,27 +69,34 @@ fn process_plugin(config: &PostBuildConfig) -> Result<(), Box<dyn std::error::Er
         return Err(format!("Plugin file not found: {}", config.plugin_path.display()).into());
     }
 
-    match std::env::consts::OS {
+    let final_path = match std::env::consts::OS {
         "macos" => process_macos_plugin(config)?,
-        "linux" => process_linux_plugin(config)?,
-        "windows" => process_windows_plugin(config)?,
+        "linux" => {
+            process_linux_plugin(config)?;
+            config.plugin_path.clone()
+        }
+        "windows" => {
+            process_windows_plugin(config)?;
+            config.plugin_path.clone()
+        }
         os => {
             if config.verbose {
                 println!("No platform-specific processing for: {}", os);
             }
+            config.plugin_path.clone()
         }
-    }
+    };
 
     if config.install_plugin {
-        install_plugin(config)?;
+        install_plugin(config, &final_path)?;
     }
 
     Ok(())
 }
 
-fn process_macos_plugin(config: &PostBuildConfig) -> Result<(), Box<dyn std::error::Error>> {
+fn process_macos_plugin(config: &PostBuildConfig) -> Result<PathBuf, Box<dyn std::error::Error>> {
     if !config.fix_rpaths {
-        return Ok(());
+        return Ok(config.plugin_path.clone());
     }
 
     if config.verbose {
@@ -197,17 +204,18 @@ fn process_macos_plugin(config: &PostBuildConfig) -> Result<(), Box<dyn std::err
     if config.plugin_path.extension().and_then(|s| s.to_str()) == Some("dylib") {
         let mut new_path = config.plugin_path.clone();
         new_path.set_extension("so");
-        
+
         fs::rename(&config.plugin_path, &new_path)?;
-        
+
         if config.verbose {
-            println!("Renamed {} to {}", 
-                    config.plugin_path.display(), 
+            println!("Renamed {} to {}",
+                    config.plugin_path.display(),
                     new_path.display());
         }
+        return Ok(new_path);
     }
 
-    Ok(())
+    Ok(config.plugin_path.clone())
 }
 
 fn process_linux_plugin(config: &PostBuildConfig) -> Result<(), Box<dyn std::error::Error>> {
@@ -247,9 +255,9 @@ fn process_windows_plugin(config: &PostBuildConfig) -> Result<(), Box<dyn std::e
     Ok(())
 }
 
-fn install_plugin(config: &PostBuildConfig) -> Result<(), Box<dyn std::error::Error>> {
+fn install_plugin(config: &PostBuildConfig, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let plugin_dir = get_wireshark_plugin_dir()?;
-    
+
     if !plugin_dir.exists() {
         fs::create_dir_all(&plugin_dir)?;
         if config.verbose {
@@ -257,16 +265,16 @@ fn install_plugin(config: &PostBuildConfig) -> Result<(), Box<dyn std::error::Er
         }
     }
 
-    let plugin_name = config.plugin_path.file_name()
+    let plugin_name = path.file_name()
         .ok_or("Invalid plugin path")?;
-    
+
     let target_path = plugin_dir.join(plugin_name);
-    
-    fs::copy(&config.plugin_path, &target_path)?;
-    
+
+    fs::copy(path, &target_path)?;
+
     if config.verbose {
-        println!("Installed plugin: {} -> {}", 
-                config.plugin_path.display(),
+        println!("Installed plugin: {} -> {}",
+                path.display(),
                 target_path.display());
     }
 
@@ -276,19 +284,23 @@ fn install_plugin(config: &PostBuildConfig) -> Result<(), Box<dyn std::error::Er
 fn get_wireshark_plugin_dir() -> Result<PathBuf, Box<dyn std::error::Error>> {
     let home = env::var("HOME")?;
     let base_path = PathBuf::from(home).join(".local/lib/wireshark/plugins");
-    
-    // Try to detect Wireshark version for the plugin directory structure
-    let version_dirs = ["4.4", "4.3", "4.2", "4.1", "4.0"];
-    
+
+    // macOS Wireshark uses hyphens (4-4); Linux uses dots (4.4). Search both,
+    // hyphenated first so an existing directory wins over creating a new one.
+    let version_dirs = ["4-4", "4.4", "4-3", "4.3", "4-2", "4.2", "4-6", "4.6"];
+
     for version in &version_dirs {
         let plugin_dir = base_path.join(version).join("epan");
-        if plugin_dir.exists() || version == &version_dirs[0] {
+        if plugin_dir.exists() {
             return Ok(plugin_dir);
         }
     }
-    
-    // Default to latest known version structure
-    Ok(base_path.join("4.4").join("epan"))
+
+    // Nothing exists yet — default to platform convention
+    #[cfg(target_os = "macos")]
+    return Ok(base_path.join("4-4").join("epan"));
+    #[cfg(not(target_os = "macos"))]
+    return Ok(base_path.join("4.4").join("epan"));
 }
 
 #[cfg(test)]

@@ -12,6 +12,10 @@ links = "wireshark"
 keywords = ["wireshark", "ffi"]
 categories = ["external-ffi-bindings"]
 
+[[bin]]
+name = "post_build"
+path = "post_build.rs"
+
 [lib]
 doctest = false # because the comments in generated bindings aren't even Rust code
 
