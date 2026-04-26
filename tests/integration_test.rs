@@ -43,6 +43,18 @@ fn ensure_builder_plugin_installed() {
     assert!(status.success(), "post_build --install failed");
 }
 
+/// Returns the running tshark's major.minor as (u32, u32), or None if tshark is absent.
+fn tshark_version() -> Option<(u32, u32)> {
+    let out = Command::new("tshark").arg("--version").output().ok()?;
+    let text = String::from_utf8_lossy(&out.stdout);
+    // "TShark (Wireshark) 4.4.1 ..."
+    let ver = text.lines().next()?.split_whitespace().nth(2)?;
+    let mut parts = ver.splitn(3, '.');
+    let major: u32 = parts.next()?.parse().ok()?;
+    let minor: u32 = parts.next()?.parse().ok()?;
+    Some((major, minor))
+}
+
 /// Wrap `payload_bytes` in an Ethernet+IP frame (proto=17, no UDP header) using
 /// text2pcap, then dissect with tshark and return the `wsdf_example` JSON layer.
 ///
@@ -356,8 +368,27 @@ fn test_macos_plugin_postprocessing() {
 ///   [3]      comp_flag = 0x00  (MSB=0 → uncompressed path)
 ///   [4..5]   orig_size = 0x000a = 10
 ///   [6..9]   raw_data  = 11 22 33 44
+///
+/// Requires tshark 4.4.x — the plugin_want_major/minor baked into the plugin by
+/// bindings.rs must match the running tshark exactly. The test is skipped (not
+/// failed) when the installed tshark is a different version.
 #[test]
 fn test_dissection_uncompressed_packet() {
+    match tshark_version() {
+        Some((4, 4)) => {}
+        Some((maj, min)) => {
+            eprintln!(
+                "skipping dissection test: requires tshark 4.4, found {}.{}",
+                maj, min
+            );
+            return;
+        }
+        None => {
+            eprintln!("skipping dissection test: tshark not found");
+            return;
+        }
+    }
+
     ensure_builder_plugin_installed();
 
     let wsdf = dissect_bytes(&[0x01, 0x00, 0x02, 0x00, 0x00, 0x0a, 0x11, 0x22, 0x33, 0x44]);

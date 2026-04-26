@@ -47,8 +47,6 @@ fn main() {
         return;
     }
 
-    let bindings_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("bindings.rs");
-
     // Load metadata configuration
     let metadata_config = load_metadata_config().unwrap_or_else(|e| {
         if env::var("CARGO_FEATURE_VERBOSE").is_ok() {
@@ -61,12 +59,8 @@ fn main() {
         println!("cargo:warning=Using metadata config: {:?}", metadata_config);
     }
 
-    // Generate fresh bindings when this crate is used for the first time
-    if !bindings_path.exists() || cfg!(feature = "bindgen") {
-        generate_bindings();
-    }
-
-    // By turning this features on, users will be able to regenerate their binding.rs
+    // Regenerate version-specific bindings when the bindgen feature is enabled.
+    // In normal builds the committed bindings_44.rs / bindings_46.rs are used directly.
     #[cfg(feature = "bindgen")]
     generate_bindings();
 
@@ -534,9 +528,63 @@ fn configure_linking(config: &WiresharkConfig, metadata_config: &MetadataConfig)
         );
     }
 
+    // Emit version cfg flags so dependent crates (and epan-sys/lib.rs itself) can
+    // select the right bindings file.  The flags are additive: a 4.6 build emits
+    // both wireshark4 and wireshark46.  Pattern mirrors openssl-sys.
+    emit_version_cfg(&config.include_dir);
+
     // Set metadata for potential post-build processing
     println!("cargo:rustc-env=WSDF_WIRESHARK_VERSION={}", config.version);
     println!("cargo:rustc-env=WSDF_LIB_DIR={}", config.lib_dir.display());
+}
+
+fn emit_version_cfg(include_dir: &Path) {
+    // Tell rustc these are valid cfg names so it doesn't warn downstream.
+    println!("cargo::rustc-check-cfg=cfg(wireshark4)");
+    println!("cargo::rustc-check-cfg=cfg(wireshark44)");
+    println!("cargo::rustc-check-cfg=cfg(wireshark46)");
+
+    let (major, minor) = read_ws_version(include_dir).unwrap_or((4, 4));
+
+    // wireshark4  — true for any 4.x build
+    println!("cargo:rustc-cfg=wireshark{}", major);
+    // wireshark44 / wireshark46 — exact minor match used for bindings selection
+    println!("cargo:rustc-cfg=wireshark{}{}", major, minor);
+
+    println!(
+        "cargo:warning=Wireshark version cfg: wireshark{} + wireshark{}{}",
+        major, major, minor
+    );
+}
+
+fn read_ws_version(include_dir: &Path) -> Option<(u32, u32)> {
+    // ws_version.h may live directly in include_dir or in a wireshark/ subdirectory.
+    let candidates = [
+        include_dir.join("ws_version.h"),
+        include_dir.join("wireshark/ws_version.h"),
+    ];
+    let content = candidates
+        .iter()
+        .find_map(|p| std::fs::read_to_string(p).ok())?;
+
+    let mut major: Option<u32> = None;
+    let mut minor: Option<u32> = None;
+    for line in content.lines() {
+        if major.is_none() {
+            if let Some(rest) = line.strip_prefix("#define WIRESHARK_VERSION_MAJOR ") {
+                major = rest.trim().parse().ok();
+            }
+        }
+        if minor.is_none() {
+            if let Some(rest) = line.strip_prefix("#define WIRESHARK_VERSION_MINOR ") {
+                minor = rest.trim().parse().ok();
+            }
+        }
+        if major.is_some() && minor.is_some() {
+            break;
+        }
+    }
+    Some((major?, minor?))
 }
 
 fn scan_wireshark_dependencies(lib_dir: &PathBuf) -> Vec<String> {
@@ -668,8 +716,9 @@ fn print_platform_specific_install_instructions() {
 }
 
 #[cfg(not(feature = "bindgen"))]
+#[allow(dead_code)]
 fn generate_bindings() {
-    panic!("Initial build requires --features bindgen. Please run: cargo build --features bindgen");
+    panic!("Regenerating bindings requires --features bindgen: cargo build --features bindgen");
 }
 
 #[cfg(feature = "bindgen")]
@@ -708,10 +757,22 @@ fn generate_bindings() {
         .generate()
         .expect("should be able to generate bindings from wrapper.h");
 
+    // Detect the version from the generated bindings to name the output file.
+    // Fall back to "44" if the constants aren't findable (safe default).
+    let bindings_str = bindings.to_string();
+    let minor = bindings_str
+        .lines()
+        .find(|l| l.contains("WIRESHARK_VERSION_MINOR"))
+        .and_then(|l| l.split('=').nth(1))
+        .and_then(|s| s.trim().trim_end_matches(';').parse::<u32>().ok())
+        .unwrap_or(4);
+    let filename = format!("bindings_4{}.rs", minor);
+
     let out_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     bindings
-        .write_to_file(out_path.join("bindings.rs"))
-        .expect("generated bindings should be written to file");
+        .write_to_file(out_path.join(&filename))
+        .unwrap_or_else(|e| panic!("failed to write {}: {}", filename, e));
+    println!("cargo:warning=Wrote {}", filename);
 }
 
 #[cfg(any(feature = "source-build", feature = "bindgen"))]
