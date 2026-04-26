@@ -14,9 +14,9 @@
 - [x] Wireshark submodule: bumped 4.4.1 → 4.4.14
 
 ### Remaining
-- [ ] Remove `mach_object` + `build-target` build-deps — replace Mach-O dynamic dep discovery with directory scan; hardcode dep link strategy
-- [ ] Gate `cmake` build-dep behind `source-build` feature (currently always compiled)
-- [ ] Integration tests: move `tests/integration_test.rs` to `wsdf/tests/`, implement `dissect_bytes(proto, port, bytes) → serde_json::Value` using text2pcap + tshark -T json (see `.claude/research/isolated-dissector-testing.md`)
+- [x] Remove `mach_object` + `build-target` build-deps — replace Mach-O dynamic dep discovery with directory scan; hardcode dep link strategy
+- [x] Gate `cmake` build-dep behind `source-build` feature (currently always compiled)
+- [x] Integration tests: `dissect_bytes(&[u8]) → serde_json::Value` helper using `text2pcap -i 17` + `tshark -T json -J wsdf_example`; `test_dissection_uncompressed_packet` asserts all builder fields
 
 ---
 
