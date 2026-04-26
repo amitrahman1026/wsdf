@@ -9,8 +9,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Set up wireshark dependencies
+      - name: Install Wireshark 4.4 from PPA
         run: |
+          sudo add-apt-repository ppa:wireshark-dev/stable -y
           sudo apt-get update
           sudo apt-get install -y \
             build-essential cmake ninja-build pkg-config \
@@ -19,7 +20,7 @@ jobs:
       - name: Install MSRV toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: "1.83"
+          toolchain: "1.85"
           override: true
       - name: Check on MSRV
         uses: actions-rs/cargo@v1
@@ -37,9 +38,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Set up wireshark dependencies (optimized)
+      - name: Install Wireshark 4.4 from PPA
         run: |
-          # Install only essential dependencies, skip GUI packages
+          sudo add-apt-repository ppa:wireshark-dev/stable -y
           sudo apt-get update
           sudo apt-get install -y \
             build-essential \
@@ -53,15 +54,12 @@ jobs:
             libgcrypt20-dev \
             libpcap-dev \
             tshark
-          # Skip the full debian-setup.sh which includes GUI dependencies
 
       - name: Verify wireshark installation
         run: |
-          echo "Checking Wireshark installation..."
           pkg-config --exists wireshark && echo "pkg-config: OK" || echo "pkg-config: Not found"
           pkg-config --modversion wireshark 2>/dev/null || echo "Version not available via pkg-config"
-          which tshark && echo "tshark: Available" || echo "tshark: Not found"
-          ls -la /usr/lib/x86_64-linux-gnu/lib*wireshark* 2>/dev/null || echo "System libraries not found"
+          tshark --version | head -1
 
       - name: Set up Rust toolchain
         uses: actions-rs/toolchain@v1
@@ -107,7 +105,6 @@ jobs:
 
       - name: Verify plugin artifacts
         run: |
-          echo "Checking built plugin artifacts..."
           ls -la target/debug/examples/ || echo "No examples built"
           if [ -f target/debug/examples/libbuilder.so ]; then
             echo "Plugin built successfully"
