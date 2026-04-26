@@ -10,7 +10,7 @@ pub struct Plugin {
 }
 
 thread_local! {
-    static PLUGIN: RefCell<Option<Plugin>> = RefCell::new(None);
+    static PLUGIN: RefCell<Option<Plugin>> = const { RefCell::new(None) };
 }
 
 impl Plugin {

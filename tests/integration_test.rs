@@ -111,7 +111,7 @@ fn dissect_bytes(payload_bytes: &[u8]) -> serde_json::Value {
 fn test_plugin_builds_successfully() {
     // Build the example plugin
     let output = Command::new("cargo")
-        .args(&["build", "--example", "builder"])
+        .args(["build", "--example", "builder"])
         .output()
         .expect("Failed to run cargo build");
 
@@ -128,7 +128,7 @@ fn test_plugin_builds_successfully() {
         .expect("Failed to get workspace root")
         .to_path_buf();
 
-    let plugin_paths = vec![
+    let plugin_paths = [
         workspace_root.join("target/debug/examples/libbuilder.so"),
         workspace_root.join("target/debug/examples/libbuilder.dylib"),
         workspace_root.join("target/debug/examples/builder.dll"),
@@ -154,7 +154,7 @@ fn test_plugin_file_properties() {
         .expect("Failed to get workspace root")
         .to_path_buf();
 
-    let plugin_paths = vec![
+    let plugin_paths = [
         workspace_root.join("target/debug/examples/libbuilder.so"),
         workspace_root.join("target/debug/examples/libbuilder.dylib"),
     ];
@@ -171,7 +171,7 @@ fn test_plugin_file_properties() {
         "macos" => {
             // Use otool to check library dependencies on macOS
             let output = Command::new("otool")
-                .args(&["-L", plugin_path])
+                .args(["-L", plugin_path])
                 .output()
                 .expect("Failed to run otool");
 
@@ -219,7 +219,7 @@ fn test_tshark_plugin_listing() {
     // This test checks if tshark can list plugins without crashing
     // It doesn't require our plugin to be properly loaded since it's just an example
 
-    let output = Command::new("tshark").args(&["-G", "plugins"]).output();
+    let output = Command::new("tshark").args(["-G", "plugins"]).output();
 
     match output {
         Ok(result) => {
@@ -252,14 +252,14 @@ fn test_build_system_environment() {
 
     // Check that Wireshark libraries can be found
     let output = Command::new("pkg-config")
-        .args(&["--exists", "wireshark"])
+        .args(["--exists", "wireshark"])
         .output();
 
     if let Ok(result) = output {
         if result.status.success() {
             // pkg-config found wireshark, verify version info
             let version_output = Command::new("pkg-config")
-                .args(&["--modversion", "wireshark"])
+                .args(["--modversion", "wireshark"])
                 .output()
                 .expect("Failed to get Wireshark version");
 
@@ -278,7 +278,7 @@ fn test_build_system_environment() {
 fn test_cargo_metadata_support() {
     // Test that our metadata configuration system works
     let output = Command::new("cargo")
-        .args(&["metadata", "--format-version", "1"])
+        .args(["metadata", "--format-version", "1"])
         .output()
         .expect("Failed to run cargo metadata");
 
@@ -325,7 +325,7 @@ fn test_macos_plugin_postprocessing() {
 
     // Check initial state
     let output = Command::new("otool")
-        .args(&["-L", temp_plugin.to_str().unwrap()])
+        .args(["-L", temp_plugin.to_str().unwrap()])
         .output()
         .expect("Failed to run otool");
 

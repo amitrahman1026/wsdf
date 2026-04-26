@@ -1,7 +1,7 @@
 #!/usr/bin/env cargo
 
 //! Post-build processing script for wsdf plugins
-//! 
+//!
 //! This script handles platform-specific post-build tasks like:
 //! - macOS: Fix rpath references for Wireshark.app bundles
 //! - Linux: Verify soname is set correctly  
@@ -28,9 +28,12 @@ struct PostBuildConfig {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    
+
     if args.len() < 2 {
-        eprintln!("Usage: {} <plugin_path> [--verbose] [--install] [--no-rpath-fix] [--target-dir <dir>]", args[0]);
+        eprintln!(
+            "Usage: {} <plugin_path> [--verbose] [--install] [--no-rpath-fix] [--target-dir <dir>]",
+            args[0]
+        );
         std::process::exit(1);
     }
 
@@ -132,7 +135,10 @@ fn process_macos_plugin(config: &PostBuildConfig) -> Result<PathBuf, Box<dyn std
         .lines()
         .filter_map(|line| {
             let trimmed = line.trim();
-            if trimmed.contains("libwireshark") || trimmed.contains("libwsutil") || trimmed.contains("libwiretap") {
+            if trimmed.contains("libwireshark")
+                || trimmed.contains("libwsutil")
+                || trimmed.contains("libwiretap")
+            {
                 Some(trimmed.split_whitespace().next().unwrap_or(""))
             } else {
                 None
@@ -148,20 +154,22 @@ fn process_macos_plugin(config: &PostBuildConfig) -> Result<PathBuf, Box<dyn std
 
     if let Ok(tshark_result) = tshark_output {
         let tshark_deps = String::from_utf8_lossy(&tshark_result.stdout);
-        
+
         for dep in deps {
             if dep.is_empty() {
                 continue;
             }
-            
-            let lib_name = Path::new(dep).file_name()
+
+            let lib_name = Path::new(dep)
+                .file_name()
                 .and_then(|s| s.to_str())
                 .unwrap_or("");
-            
+
             // Find corresponding @rpath reference in tshark
-            if let Some(rpath_ref) = tshark_deps.lines()
+            if let Some(rpath_ref) = tshark_deps
+                .lines()
                 .find(|line| line.contains(&format!("@rpath/{}", lib_name)))
-                .and_then(|line| line.trim().split_whitespace().next())
+                .and_then(|line| line.split_whitespace().next())
             {
                 // Skip if already in the correct @rpath form — install_name_tool
                 // still writes the binary even for a no-op change, which fails
@@ -227,9 +235,11 @@ fn process_macos_plugin(config: &PostBuildConfig) -> Result<PathBuf, Box<dyn std
         fs::rename(&config.plugin_path, &new_path)?;
 
         if config.verbose {
-            println!("Renamed {} to {}",
-                    config.plugin_path.display(),
-                    new_path.display());
+            println!(
+                "Renamed {} to {}",
+                config.plugin_path.display(),
+                new_path.display()
+            );
         }
         return Ok(new_path);
     }
@@ -253,7 +263,7 @@ fn process_linux_plugin(config: &PostBuildConfig) -> Result<(), Box<dyn std::err
         if config.verbose {
             println!("ELF dynamic section:\n{}", elf_info);
         }
-        
+
         if !elf_info.contains("SONAME") && config.verbose {
             println!("Warning: No SONAME found in plugin");
         }
@@ -264,13 +274,16 @@ fn process_linux_plugin(config: &PostBuildConfig) -> Result<(), Box<dyn std::err
 
 fn process_windows_plugin(config: &PostBuildConfig) -> Result<(), Box<dyn std::error::Error>> {
     if config.verbose {
-        println!("Processing Windows plugin: {}", config.plugin_path.display());
+        println!(
+            "Processing Windows plugin: {}",
+            config.plugin_path.display()
+        );
     }
-    
+
     // TODO: Implement Windows-specific post-processing
     // - DLL search path configuration
     // - Registry-based Wireshark detection
-    
+
     Ok(())
 }
 
@@ -300,7 +313,9 @@ fn plugin_path_id(version: &str) -> String {
 }
 
 fn install_plugin(config: &PostBuildConfig, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let version = config.wireshark_version.clone()
+    let version = config
+        .wireshark_version
+        .clone()
         .or_else(detect_wireshark_version)
         .unwrap_or_else(|| "4.4".to_string());
     let plugin_dir = get_wireshark_plugin_dir(&version)?;
@@ -312,17 +327,18 @@ fn install_plugin(config: &PostBuildConfig, path: &Path) -> Result<(), Box<dyn s
         }
     }
 
-    let plugin_name = path.file_name()
-        .ok_or("Invalid plugin path")?;
+    let plugin_name = path.file_name().ok_or("Invalid plugin path")?;
 
     let target_path = plugin_dir.join(plugin_name);
 
     fs::copy(path, &target_path)?;
 
     if config.verbose {
-        println!("Installed plugin: {} -> {}",
-                path.display(),
-                target_path.display());
+        println!(
+            "Installed plugin: {} -> {}",
+            path.display(),
+            target_path.display()
+        );
     }
 
     Ok(())
@@ -338,14 +354,19 @@ fn get_wireshark_plugin_dir(version: &str) -> Result<PathBuf, Box<dyn std::error
     {
         let appdata = env::var("APPDATA")?;
         return Ok(PathBuf::from(appdata)
-            .join("Wireshark").join("plugins").join(&path_id).join("epan"));
+            .join("Wireshark")
+            .join("plugins")
+            .join(&path_id)
+            .join("epan"));
     }
 
     #[cfg(not(target_os = "windows"))]
     {
         let home = env::var("HOME")?;
         Ok(PathBuf::from(home)
-            .join(".local/lib/wireshark/plugins").join(&path_id).join("epan"))
+            .join(".local/lib/wireshark/plugins")
+            .join(&path_id)
+            .join("epan"))
     }
 }
 
@@ -359,9 +380,17 @@ mod tests {
         assert!(path.to_string_lossy().contains("wireshark"));
         assert!(path.ends_with("epan"));
         #[cfg(target_os = "macos")]
-        assert!(path.to_string_lossy().contains("4-4"), "macOS must use hyphens, got: {}", path.display());
+        assert!(
+            path.to_string_lossy().contains("4-4"),
+            "macOS must use hyphens, got: {}",
+            path.display()
+        );
         #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-        assert!(path.to_string_lossy().contains("4.4"), "Linux must use dots, got: {}", path.display());
+        assert!(
+            path.to_string_lossy().contains("4.4"),
+            "Linux must use dots, got: {}",
+            path.display()
+        );
     }
 
     #[test]
@@ -377,7 +406,11 @@ mod tests {
         let result = process_plugin(&config);
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
-        assert!(msg.contains("Plugin file not found"), "unexpected error: {}", msg);
+        assert!(
+            msg.contains("Plugin file not found"),
+            "unexpected error: {}",
+            msg
+        );
     }
 
     /// Canary for the Wireshark.app frameworks rpath injected on macOS.
@@ -387,8 +420,7 @@ mod tests {
     #[cfg(target_os = "macos")]
     fn test_macos_rpath_constant() {
         assert_eq!(
-            WIRESHARK_APP_FRAMEWORKS,
-            "/Applications/Wireshark.app/Contents/Frameworks",
+            WIRESHARK_APP_FRAMEWORKS, "/Applications/Wireshark.app/Contents/Frameworks",
             "rpath constant changed — verify the new path before approving"
         );
     }

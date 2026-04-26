@@ -18,7 +18,7 @@
 //!
 //! ```rust,no_run
 //! use wsdf::wireshark::{
-//!     ProtocolBuilder, Dissector, FieldBuilder, FieldType, Encoding, 
+//!     ProtocolBuilder, Dissector, FieldBuilder, FieldType, Encoding,
 //!     Protocol, RegistrationError, ExpertGroup, ExpertSeverity, Plugin
 //! };
 //! use wsdf::plugin;
@@ -83,4 +83,3 @@
 
 pub use epan_sys;
 pub mod wireshark;
-

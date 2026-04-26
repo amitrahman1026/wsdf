@@ -29,8 +29,10 @@ use std::ffi::{c_char, c_int};
 ///     Ok(tvb.reported_length()) // Return consumed bytes
 /// });
 /// ```
+type DissectorFn = Box<dyn Fn(&mut Tree, Tvb) -> Result<i32, Box<dyn std::error::Error>>>;
+
 pub struct Dissector {
-    inner: Box<dyn Fn(&mut Tree, Tvb) -> Result<i32, Box<dyn std::error::Error>>>,
+    inner: DissectorFn,
 }
 
 impl Dissector {
@@ -59,12 +61,7 @@ impl Dissector {
 
         let tree_result = Tree::new(protocol, pinfo, proto_tree, tvb, 0);
         match tree_result {
-            Ok((mut tree, tvb_wrapper)) => {
-                match (self.inner)(&mut tree, tvb_wrapper) {
-                    Ok(consumed) => consumed,
-                    Err(_) => 0, // Error in dissection
-                }
-            }
+            Ok((mut tree, tvb_wrapper)) => (self.inner)(&mut tree, tvb_wrapper).unwrap_or_default(),
             Err(_) => 0, // Error creating tree
         }
     }
@@ -167,6 +164,9 @@ impl Tvb {
     }
 
     /// Create child TVB with new data
+    ///
+    /// # Safety
+    /// `data` must be valid for `length` bytes and outlive the returned `Tvb`.
     pub unsafe fn new_child_real_data(
         &self,
         data: *const u8,
@@ -187,7 +187,10 @@ impl Tvb {
         }
     }
 
-    /// Get raw pointer to data (unsafe)
+    /// Get raw pointer to data at `offset` for `length` bytes.
+    ///
+    /// # Safety
+    /// `offset` and `length` must be within the bounds of this TVB.
     pub unsafe fn get_ptr(&self, offset: i32, length: i32) -> *const u8 {
         epan_sys::tvb_get_ptr(self.ptr, offset, length)
     }
@@ -346,7 +349,8 @@ impl PacketInfo {
     pub fn new(ptr: *mut epan_sys::_packet_info) -> Self {
         Self { ptr }
     }
-    // This raw pointer is managed by the block allocator of wmem
+    /// # Safety
+    /// Caller must ensure `self.ptr` points to a live `packet_info` with a valid `pool`.
     pub unsafe fn alloc_string(&self, s: &str) -> *const c_char {
         let c_str = std::ffi::CString::new(s).expect("msg");
         unsafe {
@@ -356,6 +360,8 @@ impl PacketInfo {
             ptr
         }
     }
+    /// # Safety
+    /// Caller must ensure `self.ptr` points to a live `packet_info` with a valid `pool`.
     pub unsafe fn alloc_bytes(&self, bytes: &[u8]) -> *mut u8 {
         unsafe {
             let ptr = epan_sys::wmem_alloc((*self.ptr).pool, bytes.len()) as *mut u8;
@@ -375,6 +381,8 @@ impl PacketInfo {
             epan_sys::col_clear((*self.ptr).cinfo, col as i32);
         }
     }
+    /// # Safety
+    /// `self.ptr` and `tvb` must be valid for the duration of the call.
     pub unsafe fn add_data_source(&self, tvb: &Tvb, name: &str) {
         let name = self.alloc_string(name);
         epan_sys::add_new_data_source(self.ptr, tvb.as_ptr(), name);

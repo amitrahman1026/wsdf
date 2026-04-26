@@ -3,7 +3,7 @@ extern crate bindgen;
 
 use cargo_metadata::MetadataCommand;
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 #[cfg(any(feature = "source-build", feature = "bindgen"))]
 use std::process::Command;
 
@@ -14,7 +14,7 @@ struct WiresharkConfig {
     version: String,
     lib_name: String, // libwireshark vs libwireshark.18
     major_version: Option<u32>,
-    #[allow(dead_code)]  // Reserved for future version checking
+    #[allow(dead_code)] // Reserved for future version checking
     minor_version: Option<u32>,
 }
 
@@ -29,7 +29,7 @@ struct MetadataConfig {
     preferred_version: Option<String>,
 }
 
-#[allow(dead_code)]  // Error types reserved for future enhanced error handling
+#[allow(dead_code)] // Error types reserved for future enhanced error handling
 #[derive(Debug)]
 enum BuildError {
     LibraryNotFound,
@@ -116,7 +116,7 @@ fn load_metadata_config() -> Result<MetadataConfig, BuildError> {
 
         // Check for target-specific configuration
         let target = env::var("TARGET").unwrap_or_else(|_| "unknown".to_string());
-        if let Some(target_config) = wsdf_metadata.get(&format!("target.{}", target)) {
+        if let Some(target_config) = wsdf_metadata.get(format!("target.{}", target)) {
             if let Some(lib_dir) = target_config.get("wireshark_lib_dir") {
                 if let Some(path_str) = lib_dir.as_str() {
                     config.wireshark_lib_dir = Some(PathBuf::from(path_str));
@@ -379,7 +379,7 @@ fn detect_windows_wireshark(
     Err(BuildError::LibraryNotFound)
 }
 
-fn probe_wireshark_installation(lib_dir: &PathBuf, inc_dir: &PathBuf) -> Option<WiresharkConfig> {
+fn probe_wireshark_installation(lib_dir: &PathBuf, inc_dir: &Path) -> Option<WiresharkConfig> {
     if let Some(versioned) = find_versioned_library(lib_dir) {
         return Some(versioned);
     }
@@ -395,7 +395,7 @@ fn probe_wireshark_installation(lib_dir: &PathBuf, inc_dir: &PathBuf) -> Option<
         if lib_file.exists() {
             return Some(WiresharkConfig {
                 lib_dir: lib_dir.clone(),
-                include_dir: inc_dir.clone(),
+                include_dir: inc_dir.to_path_buf(),
                 version: "unknown".to_string(),
                 lib_name: "wireshark".to_string(),
                 major_version: None,
@@ -556,7 +556,10 @@ fn find_dep_lib_name(lib_dir: &PathBuf, base: &str) -> Option<String> {
             continue;
         }
         // macOS: libwsutil.16.dylib → "wsutil.16"
-        if let Some(inner) = name.strip_prefix(&prefix).and_then(|s| s.strip_suffix(".dylib")) {
+        if let Some(inner) = name
+            .strip_prefix(&prefix)
+            .and_then(|s| s.strip_suffix(".dylib"))
+        {
             if inner.chars().all(|c| c.is_ascii_digit()) {
                 return Some(format!("{}.{}", base, inner));
             }

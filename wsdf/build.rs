@@ -20,13 +20,17 @@ fn main() {
 
             for location in default_locations {
                 let path = PathBuf::from(location);
-                if path.exists() &&
-                   (path.join("libwireshark.dylib").exists() ||
-                    path.read_dir().ok().and_then(|entries| {
-                        entries.filter_map(Result::ok).find(|e| {
-                            e.file_name().to_string_lossy().starts_with("libwireshark.")
-                        })
-                    }).is_some())
+                if path.exists()
+                    && (path.join("libwireshark.dylib").exists()
+                        || path
+                            .read_dir()
+                            .ok()
+                            .and_then(|entries| {
+                                entries.filter_map(Result::ok).find(|e| {
+                                    e.file_name().to_string_lossy().starts_with("libwireshark.")
+                                })
+                            })
+                            .is_some())
                 {
                     add_rpath(location);
                     break;
@@ -38,5 +42,8 @@ fn main() {
 
 fn add_rpath(path: &str) {
     println!("cargo:rustc-link-arg=-Wl,-rpath,{}", path);
-    println!("cargo:warning=Added rpath for Wireshark libraries: {}", path);
+    println!(
+        "cargo:warning=Added rpath for Wireshark libraries: {}",
+        path
+    );
 }
