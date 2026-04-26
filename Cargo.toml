@@ -1,3 +1,6 @@
 [workspace]
 members = ["epan-sys", "wsdf"]
 resolver = "2"
+
+[workspace.lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(wireshark4)', 'cfg(wireshark44)', 'cfg(wireshark46)'] }

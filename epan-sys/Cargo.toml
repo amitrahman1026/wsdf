@@ -2,6 +2,7 @@
 name = "epan-sys"
 version = "0.2.0"
 edition = "2021"
+rust-version = "1.85"
 license = "MIT OR Apache-2.0"
 description = "FFI Bindings to Wireshark's epan module"
 homepage = "https://github.com/ghpr-asia/wsdf"
@@ -12,15 +13,24 @@ links = "wireshark"
 keywords = ["wireshark", "ffi"]
 categories = ["external-ffi-bindings"]
 
+[[bin]]
+name = "post_build"
+path = "post_build.rs"
+
 [lib]
 doctest = false # because the comments in generated bindings aren't even Rust code
 
 [build-dependencies]
 pkg-config = "0.3"
-cmake = "0.1"
+cmake = { version = "0.1", optional = true }
 bindgen = { version = "0.66", optional = true }
+semver = "1.0"
+cargo_metadata = "0.18"
+cc = "1"
 
-# Enabling this feature causes us to generate the bindings at build time instead
-# of using the pre-generated bindings.rs file.
 [features]
+# Regenerate bindings.rs at build time (slow — never pass --all-features).
 bindgen = ["dep:bindgen"]
+# Allow falling back to cloning and building Wireshark from source (~200 MB).
+# Off by default to avoid silent multi-minute downloads on first build.
+source-build = ["dep:cmake"]

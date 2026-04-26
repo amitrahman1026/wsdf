@@ -10,7 +10,7 @@ pub struct Plugin {
 }
 
 thread_local! {
-    static PLUGIN: RefCell<Option<Plugin>> = RefCell::new(None);
+    static PLUGIN: RefCell<Option<Plugin>> = const { RefCell::new(None) };
 }
 
 impl Plugin {
@@ -132,10 +132,21 @@ macro_rules! plugin {
         }
 
         // Plugin metadata
+        const fn make_version_array() -> [std::ffi::c_char; 32] {
+            let bytes = env!("CARGO_PKG_VERSION").as_bytes();
+            let mut chars = [0i8; 32];
+            let mut i = 0;
+            while i < bytes.len() && i < 31 {
+                chars[i] = bytes[i] as std::ffi::c_char;
+                i += 1;
+            }
+            chars
+        }
+
         #[no_mangle]
         #[used]
         #[allow(non_upper_case_globals)]
-        static plugin_version: [std::ffi::c_char; 6] = [48, 46, 48, 46, 49, 0];
+        static plugin_version: [std::ffi::c_char; 32] = make_version_array();
 
         #[no_mangle]
         #[used]

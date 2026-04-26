@@ -7,4 +7,7 @@
 #![allow(improper_ctypes)]
 #![allow(clippy::all)]
 
-include!(concat!(env!("CARGO_MANIFEST_DIR"), "/bindings.rs"));
+#[cfg(wireshark44)]
+include!(concat!(env!("CARGO_MANIFEST_DIR"), "/bindings_44.rs"));
+#[cfg(wireshark46)]
+include!(concat!(env!("CARGO_MANIFEST_DIR"), "/bindings_46.rs"));
