@@ -228,7 +228,7 @@ fn test_tshark_plugin_listing() {
                 // Just verify tshark can list plugins without error
                 // Our plugin may not appear here since it's a basic example
                 assert!(
-                    plugins_output.contains("plugins") || plugins_output.len() > 0,
+                    plugins_output.contains("plugins") || !plugins_output.is_empty(),
                     "tshark -G plugins produced no output"
                 );
             } else {

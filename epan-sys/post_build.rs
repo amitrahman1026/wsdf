@@ -52,15 +52,11 @@ fn main() {
             "--verbose" => config.verbose = true,
             "--install" => config.install_plugin = true,
             "--no-rpath-fix" => config.fix_rpaths = false,
-            "--target-dir" => {
-                if i + 1 < args.len() {
-                    config.target_dir = Some(PathBuf::from(&args[i + 1]));
-                }
+            "--target-dir" if i + 1 < args.len() => {
+                config.target_dir = Some(PathBuf::from(&args[i + 1]));
             }
-            "--wireshark-version" => {
-                if i + 1 < args.len() {
-                    config.wireshark_version = Some(args[i + 1].clone());
-                }
+            "--wireshark-version" if i + 1 < args.len() => {
+                config.wireshark_version = Some(args[i + 1].clone());
             }
             _ => {}
         }

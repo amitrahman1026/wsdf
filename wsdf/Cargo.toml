@@ -2,6 +2,7 @@
 name = "wsdf"
 version = "0.1.3"
 edition = "2021"
+rust-version = "1.83"
 autotests = false
 license = "MIT OR Apache-2.0"
 description = "Proc-macro based Wireshark Dissector Framework"
